@@ -23,7 +23,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50/75 text-slate-900 flex flex-col selection:bg-emerald-100 selection:text-emerald-900 pb-24 sm:pb-12">
+    <div className="min-h-screen bg-white text-slate-900 flex flex-col selection:bg-emerald-100 selection:text-emerald-900 pb-24 sm:pb-12">
       {/* Streamlined Header */}
       <Header onOpenSupabaseModal={() => setSupabaseModalOpen(true)} />
 
