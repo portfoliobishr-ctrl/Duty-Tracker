@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS public.cooking_duties (
     breakfast_completed_at TIMESTAMPTZ,
     lunch_completed BOOLEAN DEFAULT false NOT NULL,
     lunch_completed_at TIMESTAMPTZ,
+    active_student_ids UUID[] DEFAULT NULL,
+    is_temporary_swap BOOLEAN DEFAULT false NOT NULL,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );

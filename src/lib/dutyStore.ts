@@ -13,6 +13,7 @@ import {
   PoolType,
   PoolStats,
   StudentReport,
+  DailyImamState,
 } from '@/types/database';
 import {
   INITIAL_GROUPS,
@@ -35,6 +36,7 @@ const STORAGE_KEYS = {
   ROUNDS: 'duty_tracker_imam_rounds_v9',
   IMAM_LOGS: 'duty_tracker_imam_logs_v9',
   SETTINGS: 'duty_tracker_settings_v10',
+  DAILY_IMAM_STATE: 'duty_tracker_daily_imam_state_v1',
 };
 
 class DutyStore {
@@ -140,6 +142,134 @@ class DutyStore {
   public saveSystemSettings(settings: SystemSettings) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    }
+    this.notify();
+  }
+
+  // --- SWAPPING & GROUP MANAGEMENT ---
+  public swapCookingDutyMembers(dateStr: string, studentOutId: string, studentInId: string, isPermanent: boolean) {
+    const students = this.getStudents();
+    const sOut = students.find(s => s.id === studentOutId);
+    const sIn = students.find(s => s.id === studentInId);
+    if (!sOut || !sIn) return;
+
+    if (isPermanent) {
+      // Permanent: Swap their group_ids
+      const tempGroupId = sOut.group_id;
+      sOut.group_id = sIn.group_id;
+      sIn.group_id = tempGroupId;
+
+      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+      this.notify();
+
+      if (isSupabaseConfigured() && supabase) {
+        supabase.from('students').update({ group_id: sOut.group_id }).eq('id', sOut.id);
+        supabase.from('students').update({ group_id: sIn.group_id }).eq('id', sIn.id);
+      }
+    } else {
+      // Temporary: Override for a specific CookingDuty
+      let duties = this.getCookingDuties();
+      let duty = duties.find(d => d.duty_date === dateStr);
+      if (!duty) {
+        this.ensureDutyForDate(dateStr);
+        duties = this.getCookingDuties();
+        duty = duties.find(d => d.duty_date === dateStr)!;
+      }
+
+      const groups = this.getGroupsWithMembers();
+      const currentGroup = groups.find(g => g.id === duty!.group_id);
+      
+      let activeIds = duty.active_student_ids && duty.active_student_ids.length > 0
+        ? [...duty.active_student_ids]
+        : currentGroup?.members.map(m => m.id) || [];
+
+      // Replace studentOut with studentIn
+      activeIds = activeIds.map(id => id === studentOutId ? studentInId : id);
+      
+      duty.active_student_ids = activeIds;
+      duty.is_temporary_swap = true;
+
+      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
+      this.notify();
+
+      if (isSupabaseConfigured() && supabase) {
+        supabase.from('cooking_duties').upsert({
+          duty_date: duty.duty_date,
+          group_id: duty.group_id,
+          is_holiday: duty.is_holiday,
+          breakfast_completed: duty.breakfast_completed,
+          breakfast_completed_at: duty.breakfast_completed_at,
+          lunch_completed: duty.lunch_completed,
+          lunch_completed_at: duty.lunch_completed_at,
+          active_student_ids: duty.active_student_ids,
+          is_temporary_swap: duty.is_temporary_swap,
+          notes: duty.notes,
+        }, { onConflict: 'duty_date' });
+      }
+    }
+  }
+
+  public revertCookingDutySwap(dateStr: string) {
+    const duties = this.getCookingDuties();
+    const duty = duties.find(d => d.duty_date === dateStr);
+    if (!duty) return;
+
+    duty.active_student_ids = null;
+    duty.is_temporary_swap = false;
+
+    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
+    this.notify();
+
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('cooking_duties').update({
+        active_student_ids: null,
+        is_temporary_swap: false
+      }).eq('id', duty.id);
+    }
+  }
+
+  public resetGroupsToDefault() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
+    }
+    this.notify();
+
+    if (isSupabaseConfigured() && supabase) {
+      // Parallel updates for all 16 initial students
+      INITIAL_STUDENTS.forEach(student => {
+        supabase!.from('students').update({ group_id: student.group_id }).eq('id', student.id).then();
+      });
+    }
+  }
+
+  // --- DAILY IMAM PENDING STATE ---
+  public getDailyImamState(dateStr: string): DailyImamState | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.DAILY_IMAM_STATE);
+      if (stored) {
+        const parsed: DailyImamState = JSON.parse(stored);
+        if (parsed.date === dateStr) {
+          return parsed;
+        } else {
+          // Clean up old date state
+          localStorage.removeItem(STORAGE_KEYS.DAILY_IMAM_STATE);
+        }
+      }
+    } catch { }
+    return null;
+  }
+
+  public setDailyImamState(state: DailyImamState) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.DAILY_IMAM_STATE, JSON.stringify(state));
+    }
+    this.notify();
+  }
+
+  public clearDailyImamState() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.DAILY_IMAM_STATE);
     }
     this.notify();
   }
@@ -412,11 +542,13 @@ class DutyStore {
   }
 
   public toggleHoliday(dateStr: string, isHoliday: boolean): CookingDuty {
-    const duties = this.getCookingDuties();
+    let duties = this.getCookingDuties();
     let duty = duties.find((d) => d.duty_date === dateStr);
 
     if (!duty) {
-      duty = this.ensureDutyForDate(dateStr);
+      this.ensureDutyForDate(dateStr);
+      duties = this.getCookingDuties();
+      duty = duties.find((d) => d.duty_date === dateStr)!;
     }
 
     duty.is_holiday = isHoliday;
@@ -457,6 +589,8 @@ class DutyStore {
         breakfast_completed_at: duty.breakfast_completed_at,
         lunch_completed: duty.lunch_completed,
         lunch_completed_at: duty.lunch_completed_at,
+        active_student_ids: duty.active_student_ids || null,
+        is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
       }, { onConflict: 'duty_date' });
     }
@@ -465,11 +599,13 @@ class DutyStore {
   }
 
   public overrideCookingGroup(dateStr: string, groupId: number, notes?: string): CookingDuty {
-    const duties = this.getCookingDuties();
+    let duties = this.getCookingDuties();
     let duty = duties.find((d) => d.duty_date === dateStr);
 
     if (!duty) {
-      duty = this.ensureDutyForDate(dateStr);
+      this.ensureDutyForDate(dateStr);
+      duties = this.getCookingDuties();
+      duty = duties.find((d) => d.duty_date === dateStr)!;
     }
 
     duty.group_id = groupId;
@@ -490,6 +626,8 @@ class DutyStore {
         breakfast_completed_at: duty.breakfast_completed_at,
         lunch_completed: duty.lunch_completed,
         lunch_completed_at: duty.lunch_completed_at,
+        active_student_ids: duty.active_student_ids || null,
+        is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
       }, { onConflict: 'duty_date' });
     }
@@ -498,11 +636,13 @@ class DutyStore {
   }
 
   public setNoFoodDuty(dateStr: string, isNoDuty: boolean): CookingDuty {
-    const duties = this.getCookingDuties();
+    let duties = this.getCookingDuties();
     let duty = duties.find((d) => d.duty_date === dateStr);
 
     if (!duty) {
-      duty = this.ensureDutyForDate(dateStr);
+      this.ensureDutyForDate(dateStr);
+      duties = this.getCookingDuties();
+      duty = duties.find((d) => d.duty_date === dateStr)!;
     }
 
     duty.is_no_duty = isNoDuty;
@@ -533,6 +673,8 @@ class DutyStore {
         breakfast_completed_at: duty.breakfast_completed_at,
         lunch_completed: duty.lunch_completed,
         lunch_completed_at: duty.lunch_completed_at,
+        active_student_ids: duty.active_student_ids || null,
+        is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
       }, { onConflict: 'duty_date' });
     }
@@ -541,11 +683,13 @@ class DutyStore {
   }
 
   public toggleMealCompletion(dateStr: string, meal: 'breakfast' | 'lunch'): CookingDuty {
-    const duties = this.getCookingDuties();
+    let duties = this.getCookingDuties();
     let duty = duties.find((d) => d.duty_date === dateStr);
 
     if (!duty) {
-      duty = this.ensureDutyForDate(dateStr);
+      this.ensureDutyForDate(dateStr);
+      duties = this.getCookingDuties();
+      duty = duties.find((d) => d.duty_date === dateStr)!;
     }
 
     const now = new Date().toISOString();
@@ -572,6 +716,8 @@ class DutyStore {
         breakfast_completed_at: duty.breakfast_completed_at,
         lunch_completed: duty.lunch_completed,
         lunch_completed_at: duty.lunch_completed_at,
+        active_student_ids: duty.active_student_ids || null,
+        is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
       }, { onConflict: 'duty_date' });
     }
@@ -707,6 +853,11 @@ class DutyStore {
     };
 
     logs.unshift(newLog);
+
+    // Clear any pending daily state for this date
+    if (this.getDailyImamState(params.date)) {
+      this.clearDailyImamState();
+    }
 
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.IMAM_LOGS, JSON.stringify(logs));
@@ -1065,6 +1216,11 @@ class DutyStore {
       };
 
       const g = groupsWithMembers.find((item) => item.id === assignedId);
+      let actualMembers = g?.members || [];
+      if (duty.active_student_ids && duty.active_student_ids.length > 0) {
+        actualMembers = duty.active_student_ids.map(id => this.getStudents().find(s => s.id === id)).filter(Boolean) as Student[];
+      }
+
       queueItems.push({
         duty: { ...duty, group_id: assignedId },
         group: g || {
@@ -1073,7 +1229,7 @@ class DutyStore {
           is_holiday_only: assignedId >= 6,
           members: [],
         },
-        members: g?.members || [],
+        members: actualMembers,
         isToday,
       });
 
@@ -1105,9 +1261,15 @@ class DutyStore {
     const logs = this.getImamLogs();
     const rounds = this.getImamRounds();
 
-    // 1. Food Duties History: dates where student's group was on duty and completed meals
+    // 1. Food Duties History: dates where student actually worked
     const cookingHistory = duties
-      .filter((d) => d.group_id === student.group_id && (d.breakfast_completed || d.lunch_completed))
+      .filter((d) => {
+        const isDefaultMember = d.group_id === student.group_id;
+        const isActiveMember = d.active_student_ids && d.active_student_ids.length > 0 
+          ? d.active_student_ids.includes(student.id) 
+          : isDefaultMember;
+        return isActiveMember && (d.breakfast_completed || d.lunch_completed);
+      })
       .sort((a, b) => b.duty_date.localeCompare(a.duty_date))
       .map((d) => {
         let mealStatus: 'Both' | 'Breakfast Completed' | 'Lunch Completed' = 'Both';

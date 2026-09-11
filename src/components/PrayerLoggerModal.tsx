@@ -24,6 +24,7 @@ interface PrayerLoggerModalProps {
   defaultStudentId?: string;
   defaultDate?: string;
   onSuccess?: () => void;
+  onSetSubstitute?: (studentId: string, replacementStudentId: string) => void;
 }
 
 export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
@@ -32,6 +33,7 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
   defaultStudentId,
   defaultDate,
   onSuccess,
+  onSetSubstitute,
 }) => {
   const [date, setDate] = useState<string>(() => defaultDate || new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState<ImamLogStatus>('completed');
@@ -82,6 +84,13 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      if (onSetSubstitute && (status === 'replaced' || status === 'absent_replaced') && studentId && replacementStudentId) {
+        onSetSubstitute(studentId, replacementStudentId);
+        onClose();
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = dutyStore.logAsrDuty({
         date,
         status,

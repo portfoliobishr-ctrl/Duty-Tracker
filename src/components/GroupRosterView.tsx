@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Group, Student } from '@/types/database';
 import { dutyStore } from '@/lib/dutyStore';
-import { Users, Utensils, CheckCircle2, Clock, Edit3 } from 'lucide-react';
+import { Users, Utensils, CheckCircle2, Clock, Edit3, RefreshCw } from 'lucide-react';
 import { EditGroupModal } from './EditGroupModal';
 
 export const GroupRosterView: React.FC = () => {
@@ -45,15 +45,28 @@ export const GroupRosterView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 text-xs font-bold">
-          <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600">
-            <span>Regular: </span>
-            <strong className="text-emerald-700">5 Groups</strong>
+        <div className="flex flex-col sm:items-end space-y-3">
+          <div className="flex items-center space-x-2 text-xs font-bold">
+            <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600">
+              <span>Regular: </span>
+              <strong className="text-emerald-700">5 Groups</strong>
+            </div>
+            <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600">
+              <span>College: </span>
+              <strong className="text-purple-700">3 Groups</strong>
+            </div>
           </div>
-          <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600">
-            <span>College: </span>
-            <strong className="text-purple-700">3 Groups</strong>
-          </div>
+          <button 
+            onClick={() => {
+              if (window.confirm('Are you sure you want to reset all groups back to their original defaults? This will overwrite any permanent member swaps.')) {
+                dutyStore.resetGroupsToDefault();
+              }
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-100"
+          >
+            <RefreshCw className="w-3 h-3" />
+            <span>Reset All to Default</span>
+          </button>
         </div>
       </div>
 

@@ -11,13 +11,18 @@ import {
   Calendar,
   Users2,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  ArrowRightLeft
 } from 'lucide-react';
+import { SwapMemberModal } from './SwapMemberModal';
+import { Student } from '@/types/database';
 
 export const UpcomingQueueView: React.FC = () => {
   const [cookingQueue, setCookingQueue] = useState<ReturnType<typeof dutyStore.getUpcomingCookingQueue>>([]);
   const [selectedImamPool, setSelectedImamPool] = useState<PoolType>('regular');
   const [asrQueue, setAsrQueue] = useState<ReturnType<typeof dutyStore.getUpcomingAsrQueue> | null>(null);
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [selectedDutyForSwap, setSelectedDutyForSwap] = useState<{ date: string, members: Student[] } | null>(null);
 
   const refreshData = () => {
     setCookingQueue(dutyStore.getUpcomingCookingQueue(7));
@@ -113,14 +118,32 @@ export const UpcomingQueueView: React.FC = () => {
                         </span>
                       ) : null}
                     </div>
-                    <p className={`text-xs font-medium mt-0.5 ${item.duty.is_no_duty ? 'text-purple-600/80' : 'text-slate-500'}`}>
-                      {memberNames}
+                    <p className={`text-xs font-medium mt-0.5 flex items-center space-x-2 ${item.duty.is_no_duty ? 'text-purple-600/80' : 'text-slate-500'}`}>
+                      <span>{memberNames}</span>
+                      {item.duty.is_temporary_swap && (
+                        <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded leading-none">
+                          Swapped
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-xs font-semibold text-slate-600 block">
+                <div className="flex items-center space-x-3 text-right">
+                  {!item.duty.is_no_duty && !isCompleted && (
+                    <button 
+                      onClick={() => {
+                        setSelectedDutyForSwap({ date: item.duty.duty_date, members: item.members });
+                        setSwapModalOpen(true);
+                      }}
+                      className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                      title="Swap Member"
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <div>
+                    <span className="text-xs font-semibold text-slate-600 block">
                     {formatDateLabel(item.duty.duty_date, item.isToday, idx)}
                   </span>
                   <div className="mt-0.5">
@@ -145,6 +168,7 @@ export const UpcomingQueueView: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
             );
           })}
         </div>
@@ -260,6 +284,21 @@ export const UpcomingQueueView: React.FC = () => {
         </div>
       </section>
 
+      {selectedDutyForSwap && (
+        <SwapMemberModal
+          isOpen={swapModalOpen}
+          onClose={() => {
+            setSwapModalOpen(false);
+            setTimeout(() => setSelectedDutyForSwap(null), 200);
+          }}
+          dutyDate={selectedDutyForSwap.date}
+          currentMembers={selectedDutyForSwap.members}
+          onSuccess={() => {
+            refreshData();
+            setSwapModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

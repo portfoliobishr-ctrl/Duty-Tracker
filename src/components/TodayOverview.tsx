@@ -5,7 +5,8 @@ import {
   CookingDuty, 
   Student, 
   Group, 
-  ImamLog 
+  ImamLog,
+  DailyImamState
 } from '@/types/database';
 import { dutyStore } from '@/lib/dutyStore';
 import { getRelativeDateString, isFriday, isHolidayOrSunday } from '@/lib/seedData';
@@ -20,9 +21,11 @@ import {
   Sparkles,
   Users2,
   Clock3,
-  Coffee
+  Coffee,
+  ArrowRightLeft
 } from 'lucide-react';
 import { PrayerLoggerModal } from './PrayerLoggerModal';
+import { SwapMemberModal } from './SwapMemberModal';
 import confetti from 'canvas-confetti';
 
 export const TodayOverview: React.FC = () => {
@@ -37,9 +40,11 @@ export const TodayOverview: React.FC = () => {
     queuePosition: number;
     totalInPool: number;
   } | null>(null);
+  const [dailyImamState, setDailyImamState] = useState<DailyImamState | null>(() => dutyStore.getDailyImamState(getRelativeDateString(0)));
 
   // Modal for Substitute / No Imam
   const [prayerModalOpen, setPrayerModalOpen] = useState(false);
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
 
   const { showToast } = useToast();
 
@@ -53,6 +58,8 @@ export const TodayOverview: React.FC = () => {
 
     const asrLog = dutyStore.getImamLogs().find((l) => l.date === todayDate && l.prayer_name === 'Asr') || null;
     setTodayAsrLog(asrLog);
+
+    setDailyImamState(dutyStore.getDailyImamState(todayDate));
   };
 
   useEffect(() => {
@@ -63,7 +70,13 @@ export const TodayOverview: React.FC = () => {
 
   // Current cooking group & members
   const assignedCookingGroup = groups.find((g) => g.id === todayDuty?.group_id);
-  const cookingMembers = assignedCookingGroup?.members || [];
+  let cookingMembers = assignedCookingGroup?.members || [];
+  if (todayDuty?.active_student_ids && todayDuty.active_student_ids.length > 0) {
+    const allSt = dutyStore.getStudents();
+    cookingMembers = todayDuty.active_student_ids
+      .map(id => allSt.find(s => s.id === id))
+      .filter(Boolean) as Student[];
+  }
 
   // Holiday Toggle
   const handleToggleHoliday = () => {
@@ -104,14 +117,25 @@ export const TodayOverview: React.FC = () => {
 
   // 1-Tap Mark Asr Led
   const handleMarkAsrLed = () => {
-    if (!assignedAsr?.student) return;
+    const activeStudentId = dailyImamState?.acting_student_id || assignedAsr?.student?.id;
+    if (!activeStudentId) return;
 
-    dutyStore.logAsrDuty({
-      date: todayDate,
-      studentId: assignedAsr.student.id,
-      status: 'completed',
-      notes: 'Confirmed from Today action screen',
-    });
+    if (dailyImamState?.acting_student_id) {
+      dutyStore.logAsrDuty({
+        date: todayDate,
+        studentId: dailyImamState.assigned_student_id,
+        status: 'absent_replaced',
+        replacementStudentId: dailyImamState.acting_student_id,
+        notes: 'Confirmed from Today action screen (Substitute)',
+      });
+    } else if (assignedAsr?.student) {
+      dutyStore.logAsrDuty({
+        date: todayDate,
+        studentId: assignedAsr.student.id,
+        status: 'completed',
+        notes: 'Confirmed from Today action screen',
+      });
+    }
 
     try {
       confetti({
@@ -122,7 +146,12 @@ export const TodayOverview: React.FC = () => {
       });
     } catch {}
 
-    showToast(`Asr prayer recorded for ${assignedAsr.student.name}`, 'success');
+    const allStudents = dutyStore.getStudents();
+    const activeStudent = dailyImamState?.acting_student_id 
+      ? allStudents.find(s => s.id === dailyImamState.acting_student_id)
+      : assignedAsr?.student;
+
+    showToast(`Asr prayer recorded for ${activeStudent?.name}`, 'success');
     refreshData();
   };
 
@@ -145,6 +174,10 @@ export const TodayOverview: React.FC = () => {
         ? allStudents.find((s) => s.id === todayAsrLog.replacement_student_id)
         : allStudents.find((s) => s.id === todayAsrLog.student_id))
     : assignedAsr?.student;
+
+  const pendingSubstituteId = dailyImamState?.acting_student_id;
+  const pendingSubstituteStudent = pendingSubstituteId ? allStudents.find(s => s.id === pendingSubstituteId) : null;
+  const activeStudent = pendingSubstituteStudent || assignedAsr?.student;
 
   // Next Asr candidate for upcoming duty (after today)
   const tomorrowDate = getRelativeDateString(1);
@@ -307,17 +340,48 @@ export const TodayOverview: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-medium">
-              <Clock3 className="w-3.5 h-3.5 text-slate-400" />
-              <span>{formattedToday}</span>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-medium">
+                <Clock3 className="w-3.5 h-3.5 text-slate-400" />
+                <span>{formattedToday}</span>
+              </div>
+              {assignedCookingGroup && (
+                <button 
+                  onClick={() => setSwapModalOpen(true)}
+                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 transition-colors"
+                  title="Swap Member"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Students Assigned */}
           <div className="px-4 py-3.5 bg-slate-50/60 border-b border-slate-100">
-            <div className="text-[11px] font-semibold text-slate-500 mb-1.5 flex items-center space-x-1">
-              <Users2 className="w-3.5 h-3.5" />
-              <span>Assigned Cooking Pair:</span>
+            <div className="text-[11px] font-semibold text-slate-500 mb-1.5 flex items-center justify-between">
+              <div className="flex items-center space-x-1">
+                <Users2 className="w-3.5 h-3.5" />
+                <span>Assigned Cooking Pair:</span>
+              </div>
+              {todayDuty?.is_temporary_swap && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                    Temporary Swap
+                  </span>
+                  {!(isBreakfastDone && isLunchDone) && (
+                    <button 
+                      onClick={() => {
+                        dutyStore.revertCookingDutySwap(todayDate);
+                        refreshData();
+                      }}
+                      className="text-[9px] font-bold text-slate-500 hover:text-amber-700 hover:underline"
+                    >
+                      Revert
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               {cookingMembers.length > 0 ? (
@@ -513,14 +577,19 @@ export const TodayOverview: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white font-bold text-lg flex items-center justify-center shadow-sm shadow-emerald-600/20">
-                  {assignedAsr?.student?.name ? assignedAsr.student.name.charAt(0) : 'D'}
+                  {activeStudent?.name ? activeStudent.name.charAt(0) : 'D'}
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-emerald-800 block">
-                    Scheduled Asr Imam (Alphabetical Order)
+                  <span className="text-xs font-semibold text-emerald-800 flex items-center space-x-1">
+                    <span>Scheduled Asr Imam</span>
+                    {pendingSubstituteStudent && (
+                      <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                        [Substituted]
+                      </span>
+                    )}
                   </span>
                   <span className="text-xl font-extrabold text-slate-900 tracking-tight">
-                    {assignedAsr?.student?.name || 'Dilshad'}
+                    {activeStudent?.name || 'Dilshad'}
                   </span>
                   <div className="flex items-center space-x-1.5 mt-0.5 text-xs text-slate-500">
                     <span>Round 1</span>
@@ -560,13 +629,25 @@ export const TodayOverview: React.FC = () => {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Mark Asr Led by {assignedAsr?.student?.name || 'Dilshad'}</span>
+                <span>Mark Asr Led by {activeStudent?.name || 'Dilshad'}</span>
               </>
             )}
           </button>
 
           {/* Small Helper Button for Substitute / No Imam */}
-          <div className="flex justify-end">
+          <div className="flex justify-end space-x-3">
+            {pendingSubstituteStudent && !isAsrDone && (
+              <button
+                type="button"
+                onClick={() => {
+                  dutyStore.clearDailyImamState();
+                  refreshData();
+                }}
+                className="text-xs font-semibold text-slate-500 hover:text-amber-700 hover:underline flex items-center py-1 px-2"
+              >
+                Cancel / Revert
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setPrayerModalOpen(true)}
@@ -588,6 +669,26 @@ export const TodayOverview: React.FC = () => {
         onSuccess={() => {
           refreshData();
           setPrayerModalOpen(false);
+        }}
+        onSetSubstitute={(studentId, replacementStudentId) => {
+          dutyStore.setDailyImamState({
+            date: todayDate,
+            assigned_student_id: studentId,
+            acting_student_id: replacementStudentId,
+            status: 'pending'
+          });
+          refreshData();
+        }}
+      />
+
+      <SwapMemberModal
+        isOpen={swapModalOpen}
+        onClose={() => setSwapModalOpen(false)}
+        dutyDate={todayDate}
+        currentMembers={cookingMembers}
+        onSuccess={() => {
+          refreshData();
+          setSwapModalOpen(false);
         }}
       />
     </div>

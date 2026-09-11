@@ -39,6 +39,8 @@ export interface CookingDuty {
   breakfast_completed_at?: string | null;
   lunch_completed: boolean;
   lunch_completed_at?: string | null;
+  active_student_ids?: string[] | null;
+  is_temporary_swap?: boolean;
   notes?: string | null;
   created_at?: string;
   group?: Group;
@@ -103,5 +105,12 @@ export interface StudentReport {
   replacedCount: number; // times they served as replacement/substitute
   hasLedCurrentRound: boolean;
   isNextAsrCandidate: boolean;
+}
+
+export interface DailyImamState {
+  date: string;
+  assigned_student_id: string;
+  acting_student_id: string | null;
+  status: 'pending' | 'completed';
 }
 
