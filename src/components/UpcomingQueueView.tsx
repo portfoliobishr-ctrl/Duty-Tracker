@@ -1,0 +1,265 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { dutyStore } from '@/lib/dutyStore';
+import { PoolType } from '@/types/database';
+import { 
+  Utensils, 
+  Compass, 
+  CheckCircle2, 
+  Clock, 
+  Calendar,
+  Users2,
+  ChevronRight,
+  ArrowRight
+} from 'lucide-react';
+
+export const UpcomingQueueView: React.FC = () => {
+  const [cookingQueue, setCookingQueue] = useState<ReturnType<typeof dutyStore.getUpcomingCookingQueue>>([]);
+  const [selectedImamPool, setSelectedImamPool] = useState<PoolType>('regular');
+  const [asrQueue, setAsrQueue] = useState<ReturnType<typeof dutyStore.getUpcomingAsrQueue> | null>(null);
+
+  const refreshData = () => {
+    setCookingQueue(dutyStore.getUpcomingCookingQueue(7));
+    setAsrQueue(dutyStore.getUpcomingAsrQueue(selectedImamPool));
+  };
+
+  useEffect(() => {
+    refreshData();
+    const unsubscribe = dutyStore.subscribe(refreshData);
+    return () => unsubscribe();
+  }, [selectedImamPool]);
+
+  // Format date helper (e.g., "Today", "Tomorrow", "Fri, Sep 12")
+  const formatDateLabel = (dateStr: string, isToday: boolean, idx: number) => {
+    if (isToday || idx === 0) return 'Today';
+    if (idx === 1) return 'Tomorrow';
+    const parts = dateStr.split('-');
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="space-y-6 max-w-lg mx-auto pb-8">
+      
+      {/* SECTION 1: Next Cooking Teams */}
+      <section className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        {/* Section Header */}
+        <div className="p-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-white flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center">
+              <Utensils className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 leading-tight">
+                Next Cooking Teams
+              </h2>
+              <p className="text-xs text-slate-500">
+                Upcoming rotation order (Groups 1–8)
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200/50">
+            7-Day Schedule
+          </span>
+        </div>
+
+
+        {/* Detailed Queue List */}
+        <div className="divide-y divide-slate-100">
+          {cookingQueue.map((item, idx) => {
+            const memberNames = item.duty.is_no_duty 
+              ? 'No cooking duty scheduled (Morning & Evening Off)' 
+              : item.members.map((m) => m.name).join(', ') || 'Assigned Students';
+            const isCompleted = item.duty.breakfast_completed && item.duty.lunch_completed;
+            const isPartial = (item.duty.breakfast_completed || item.duty.lunch_completed) && !isCompleted;
+
+            return (
+              <div 
+                key={item.duty.id}
+                className={`p-3.5 flex items-center justify-between transition-colors ${
+                  item.isToday 
+                    ? item.duty.is_no_duty ? 'bg-purple-50/40' : 'bg-emerald-50/30' 
+                    : 'hover:bg-slate-50/60'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
+                    item.isToday 
+                      ? item.duty.is_no_duty ? 'bg-purple-600 text-white' : 'bg-emerald-600 text-white' 
+                      : item.duty.is_no_duty ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        {item.duty.is_no_duty ? 'Friday Off (No Food Duty)' : item.group.name}
+                      </span>
+                      {item.isToday && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          item.duty.is_no_duty ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          Today
+                        </span>
+                      )}
+                      {item.duty.is_no_duty ? (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">
+                          Mess Off
+                        </span>
+                      ) : item.duty.is_holiday ? (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          Holiday
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className={`text-xs font-medium mt-0.5 ${item.duty.is_no_duty ? 'text-purple-600/80' : 'text-slate-500'}`}>
+                      {memberNames}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-slate-600 block">
+                    {formatDateLabel(item.duty.duty_date, item.isToday, idx)}
+                  </span>
+                  <div className="mt-0.5">
+                    {item.duty.is_no_duty ? (
+                      <span className="text-[11px] font-bold text-purple-600">
+                        Off Day
+                      </span>
+                    ) : isCompleted ? (
+                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center justify-end space-x-0.5">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Completed</span>
+                      </span>
+                    ) : isPartial ? (
+                      <span className="text-[11px] font-semibold text-amber-600">
+                        In Progress
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* SECTION 2: Next Asr Imams (Alphabetical Queue) */}
+      <section className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        {/* Section Header */}
+        <div className="p-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-white flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 leading-tight">
+                Next Asr Imams
+              </h2>
+              <p className="text-xs text-slate-500">
+                Alphabetical rotation order • Round 1
+              </p>
+            </div>
+          </div>
+
+          {/* Pool Selector: Regular vs College */}
+          <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200/60 text-xs">
+            <button
+              type="button"
+              onClick={() => setSelectedImamPool('regular')}
+              className={`px-2 py-1 rounded-md font-semibold transition-all ${
+                selectedImamPool === 'regular'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Regular (10)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedImamPool('college')}
+              className={`px-2 py-1 rounded-md font-semibold transition-all ${
+                selectedImamPool === 'college'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              College (6)
+            </button>
+          </div>
+        </div>
+
+
+        {/* Detailed Queue List */}
+        <div className="divide-y divide-slate-100">
+          {asrQueue?.queue.map((item) => {
+            return (
+              <div 
+                key={item.student.id}
+                className={`p-3.5 flex items-center justify-between transition-colors ${
+                  item.isNext 
+                    ? 'bg-emerald-50/50' 
+                    : item.hasCompletedRound 
+                    ? 'bg-slate-50/40 opacity-75' 
+                    : 'hover:bg-slate-50/60'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
+                    item.isNext 
+                      ? 'bg-emerald-600 text-white shadow-xs' 
+                      : item.hasCompletedRound 
+                      ? 'bg-slate-200 text-slate-500' 
+                      : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {item.hasCompletedRound ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : item.orderIndex}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-sm font-bold ${
+                        item.hasCompletedRound ? 'text-slate-500 line-through' : 'text-slate-900'
+                      }`}>
+                        {item.student.name}
+                      </span>
+                      {item.isNext && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                          Next Up
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      Group {item.student.group_id} • Alphabetical #{item.orderIndex}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  {item.hasCompletedRound ? (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                      Completed
+                    </span>
+                  ) : item.isNext ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Scheduled
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-slate-400">
+                      In Queue
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+    </div>
+  );
+};
