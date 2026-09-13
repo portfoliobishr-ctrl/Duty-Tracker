@@ -28,6 +28,7 @@ import {
   isHolidayOrSunday,
 } from './seedData';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 const STORAGE_KEYS = {
   GROUPS: 'duty_tracker_groups_v8',
@@ -42,6 +43,19 @@ const STORAGE_KEYS = {
 class DutyStore {
   private listeners: Set<() => void> = new Set();
   public isSyncing: boolean = false;
+
+  private state = {
+    groups: INITIAL_GROUPS,
+    students: INITIAL_STUDENTS,
+    cooking_duties: generateInitialCookingDuties(),
+    rounds: INITIAL_ROUNDS,
+    imam_logs: generateInitialImamLogs(INITIAL_ROUNDS[0].id),
+    settings: INITIAL_SYSTEM_SETTINGS,
+    daily_imam_state: null as DailyImamState | null,
+    isInitialized: false,
+  };
+  private subscription: RealtimeChannel | null = null;
+
 
   public async syncFromSupabase(): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || typeof window === 'undefined') return false;
@@ -73,13 +87,11 @@ class DutyStore {
         return false;
       }
 
-      if (groups && groups.length > 0) localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(groups));
-      if (students && students.length > 0) localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
-      if (cooking && cooking.length > 0) localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(cooking));
-      if (rounds && rounds.length > 0) localStorage.setItem(STORAGE_KEYS.ROUNDS, JSON.stringify(rounds));
-      if (logs && logs.length > 0) localStorage.setItem(STORAGE_KEYS.IMAM_LOGS, JSON.stringify(logs));
-      if (settings && settings.length > 0) localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings[0]));
-
+      if (groups && groups.length > 0) this.state.groups = groups;
+                                    
+      this.state.isInitialized = true;
+      this.setupRealtimeSubscriptions();
+                              
       this.isSyncing = false;
       this.notify();
       return true;
@@ -91,6 +103,78 @@ class DutyStore {
     }
   }
 
+
+  public setupRealtimeSubscriptions() {
+    if (!supabase || this.subscription) return;
+    this.subscription = supabase.channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cooking_duties' }, (payload) => {
+        const newDuty = payload.new as CookingDuty;
+        if (payload.eventType === 'INSERT') {
+          const exists = this.state.cooking_duties.find(d => d.id === newDuty.id || d.duty_date === newDuty.duty_date);
+          if (!exists) {
+            this.state.cooking_duties.push(newDuty);
+            this.state.cooking_duties.sort((a, b) => a.duty_date.localeCompare(b.duty_date));
+          } else {
+             Object.assign(exists, newDuty);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const idx = this.state.cooking_duties.findIndex(d => d.id === newDuty.id || d.duty_date === newDuty.duty_date);
+          if (idx !== -1) {
+            this.state.cooking_duties[idx] = newDuty;
+          } else {
+            this.state.cooking_duties.push(newDuty);
+            this.state.cooking_duties.sort((a, b) => a.duty_date.localeCompare(b.duty_date));
+          }
+        } else if (payload.eventType === 'DELETE') {
+           this.state.cooking_duties = this.state.cooking_duties.filter(d => d.id !== payload.old.id);
+        }
+        this.notify();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'imam_logs' }, (payload) => {
+         const newLog = payload.new as ImamLog;
+         if (payload.eventType === 'INSERT') {
+           const exists = this.state.imam_logs.find(l => l.id === newLog.id);
+           if (!exists) {
+             this.state.imam_logs.unshift(newLog);
+           }
+         } else if (payload.eventType === 'UPDATE') {
+           const idx = this.state.imam_logs.findIndex(l => l.id === newLog.id);
+           if (idx !== -1) this.state.imam_logs[idx] = newLog;
+         } else if (payload.eventType === 'DELETE') {
+            this.state.imam_logs = this.state.imam_logs.filter(l => l.id !== payload.old.id);
+         }
+         this.notify();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, (payload) => {
+         const newStudent = payload.new as Student;
+         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+           const idx = this.state.students.findIndex(s => s.id === newStudent.id);
+           if (idx !== -1) this.state.students[idx] = newStudent;
+           else this.state.students.push(newStudent);
+           this.notify();
+         }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, (payload) => {
+         const newGroup = payload.new as Group;
+         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+           const idx = this.state.groups.findIndex(g => g.id === newGroup.id);
+           if (idx !== -1) this.state.groups[idx] = newGroup;
+           else this.state.groups.push(newGroup);
+           this.notify();
+         }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'imam_rounds' }, (payload) => {
+         const newRound = payload.new as ImamRound;
+         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+           const idx = this.state.rounds.findIndex(r => r.id === newRound.id);
+           if (idx !== -1) this.state.rounds[idx] = newRound;
+           else this.state.rounds.push(newRound);
+           this.notify();
+         }
+      })
+      .subscribe();
+  }
+
   public subscribe(listener: () => void) {
     this.listeners.add(listener);
     return () => {
@@ -99,6 +183,14 @@ class DutyStore {
   }
 
   private notify() {
+    this.state = {
+      ...this.state,
+      groups: [...this.state.groups],
+      students: [...this.state.students],
+      cooking_duties: [...this.state.cooking_duties],
+      rounds: [...this.state.rounds],
+      imam_logs: [...this.state.imam_logs],
+    };
     // Schedule notification asynchronously so state updates don't collide with React render cycles
     if (typeof window !== 'undefined') {
       setTimeout(() => {
@@ -123,26 +215,11 @@ class DutyStore {
 
   // --- SYSTEM SETTINGS ---
   public getSystemSettings(): SystemSettings {
-    if (typeof window === 'undefined') return INITIAL_SYSTEM_SETTINGS;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      if (stored) {
-        const parsed: SystemSettings = JSON.parse(stored);
-        if (!parsed.default_holidays.includes(6)) {
-          parsed.default_holidays.push(6);
-          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
-        }
-        return parsed;
-      }
-    } catch { }
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
-    return INITIAL_SYSTEM_SETTINGS;
+    return this.state.settings;
   }
 
   public saveSystemSettings(settings: SystemSettings) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    }
+    this.state.settings = settings;
     this.notify();
   }
 
@@ -159,7 +236,7 @@ class DutyStore {
       sOut.group_id = sIn.group_id;
       sIn.group_id = tempGroupId;
 
-      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+      
       this.notify();
 
       if (isSupabaseConfigured() && supabase) {
@@ -189,7 +266,7 @@ class DutyStore {
       duty.active_student_ids = activeIds;
       duty.is_temporary_swap = true;
 
-      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
+      
       this.notify();
 
       if (isSupabaseConfigured() && supabase) {
@@ -217,7 +294,7 @@ class DutyStore {
     duty.active_student_ids = null;
     duty.is_temporary_swap = false;
 
-    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
+    
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
@@ -229,9 +306,7 @@ class DutyStore {
   }
 
   public resetGroupsToDefault() {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
-    }
+    
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
@@ -244,62 +319,27 @@ class DutyStore {
 
   // --- DAILY IMAM PENDING STATE ---
   public getDailyImamState(dateStr: string): DailyImamState | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.DAILY_IMAM_STATE);
-      if (stored) {
-        const parsed: DailyImamState = JSON.parse(stored);
-        if (parsed.date === dateStr) {
-          return parsed;
-        } else {
-          // Clean up old date state
-          localStorage.removeItem(STORAGE_KEYS.DAILY_IMAM_STATE);
-        }
-      }
-    } catch { }
+    if (this.state.daily_imam_state?.date === dateStr) return this.state.daily_imam_state;
     return null;
   }
 
   public setDailyImamState(state: DailyImamState) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.DAILY_IMAM_STATE, JSON.stringify(state));
-    }
+    this.state.daily_imam_state = state;
     this.notify();
   }
 
   public clearDailyImamState() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEYS.DAILY_IMAM_STATE);
-    }
+    this.state.daily_imam_state = null;
     this.notify();
   }
 
   // --- LOCAL CACHE INITIALIZERS ---
   public getGroups(): Group[] {
-    if (typeof window === 'undefined') return INITIAL_GROUPS;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.GROUPS);
-      if (stored) return JSON.parse(stored);
-    } catch { }
-    localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(INITIAL_GROUPS));
-    return INITIAL_GROUPS;
+    return this.state.groups;
   }
 
   public getStudents(): Student[] {
-    if (typeof window === 'undefined') return INITIAL_STUDENTS;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-      if (stored) {
-        const parsed: Student[] = JSON.parse(stored);
-        if (parsed.some((s) => s.name.includes('Zayd') || s.name.includes('Bilal Ahmed'))) {
-          localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
-          return INITIAL_STUDENTS;
-        }
-        return parsed;
-      }
-    } catch { }
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
-    return INITIAL_STUDENTS;
+    return this.state.students;
   }
 
   public getPrayerSlots(): PrayerSlot[] {
@@ -307,50 +347,15 @@ class DutyStore {
   }
 
   public getCookingDuties(): CookingDuty[] {
-    if (typeof window === 'undefined') return generateInitialCookingDuties();
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.COOKING);
-      if (stored) {
-        const parsed: CookingDuty[] = JSON.parse(stored);
-        let updated = false;
-        parsed.forEach((d) => {
-          if (isFriday(d.duty_date) && !d.is_no_duty && !d.breakfast_completed && !d.lunch_completed) {
-            d.is_no_duty = true;
-            d.group_id = null;
-            d.notes = 'Friday - No Food Duty (Morning & Evening)';
-            updated = true;
-          }
-        });
-        if (updated) {
-          localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(parsed));
-        }
-        return parsed;
-      }
-    } catch { }
-    const initial = generateInitialCookingDuties();
-    localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(initial));
-    return initial;
+    return this.state.cooking_duties;
   }
 
   public getImamRounds(): ImamRound[] {
-    if (typeof window === 'undefined') return INITIAL_ROUNDS;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.ROUNDS);
-      if (stored) return JSON.parse(stored);
-    } catch { }
-    localStorage.setItem(STORAGE_KEYS.ROUNDS, JSON.stringify(INITIAL_ROUNDS));
-    return INITIAL_ROUNDS;
+    return this.state.rounds;
   }
 
   public getImamLogs(): ImamLog[] {
-    if (typeof window === 'undefined') return generateInitialImamLogs(INITIAL_ROUNDS[0].id);
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.IMAM_LOGS);
-      if (stored) return JSON.parse(stored);
-    } catch { }
-    const initial = generateInitialImamLogs(INITIAL_ROUNDS[0].id);
-    localStorage.setItem(STORAGE_KEYS.IMAM_LOGS, JSON.stringify(initial));
-    return initial;
+    return this.state.imam_logs;
   }
 
   // --- GROUPS WITH MEMBERS ---
@@ -381,9 +386,7 @@ class DutyStore {
         is_holiday_only: params.is_holiday_only,
         description: params.description ?? groups[groupIdx].description,
       };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(groups));
-      }
+      
 
       if (isSupabaseConfigured() && supabase) {
         supabase.from('groups').update({
@@ -410,9 +413,7 @@ class DutyStore {
       }
     });
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
-    }
+    
 
     this.notify();
   }
@@ -471,17 +472,13 @@ class DutyStore {
         };
         duties.push(duty);
         duties.sort((a, b) => a.duty_date.localeCompare(b.duty_date));
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-        }
+        
         this.notify();
       } else if (!duty.is_no_duty) {
         duty.is_no_duty = true;
         duty.group_id = null;
         duty.notes = 'Friday - No Food Duty (Morning & Evening)';
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-        }
+        
         this.notify();
       }
       return duty;
@@ -502,9 +499,7 @@ class DutyStore {
       if (dateStr === today && duty.group_id !== activeGroup) {
         duty.group_id = activeGroup;
         duty.is_holiday = isHoliday;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-        }
+        
         this.notify();
       }
       return duty;
@@ -527,9 +522,7 @@ class DutyStore {
     duties.push(newDuty);
     duties.sort((a, b) => a.duty_date.localeCompare(b.duty_date));
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-    }
+    
     this.notify();
     return newDuty;
   }
@@ -575,9 +568,7 @@ class DutyStore {
       duty.notes = null;
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-    }
+    
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
@@ -612,9 +603,7 @@ class DutyStore {
     duty.is_no_duty = false;
     if (notes !== undefined) duty.notes = notes;
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-    }
+    
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
@@ -659,9 +648,7 @@ class DutyStore {
       duty.notes = isHoliday ? 'College Team (Holiday / Weekend)' : 'Regular Turn';
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-    }
+    
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
@@ -702,9 +689,7 @@ class DutyStore {
       duty.lunch_completed_at = duty.lunch_completed ? now : null;
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(duties));
-    }
+    
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
@@ -764,9 +749,7 @@ class DutyStore {
       created_at: new Date().toISOString(),
     };
     rounds.push(newRound);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.ROUNDS, JSON.stringify(rounds));
-    }
+    
     return newRound;
   }
 
@@ -859,9 +842,7 @@ class DutyStore {
       this.clearDailyImamState();
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.IMAM_LOGS, JSON.stringify(logs));
-    }
+    
 
     // Check round progression for this pool
     let roundAdvanced = false;
@@ -897,9 +878,7 @@ class DutyStore {
 
       allRounds.push(newRound);
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.ROUNDS, JSON.stringify(allRounds));
-      }
+      
     }
 
     this.notify();
@@ -952,9 +931,7 @@ class DutyStore {
       const filtered = logs.filter(
         (l) => !(l.round_id === activeRound.id && (l.student_id === studentId || l.replacement_student_id === studentId))
       );
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.IMAM_LOGS, JSON.stringify(filtered));
-      }
+      
       this.notify();
     }
   }
@@ -1094,9 +1071,13 @@ class DutyStore {
         is_holiday_only: s.group_id >= 6,
       };
 
-      const completedDuties = duties.filter(
-        (d) => d.group_id === s.group_id && (d.breakfast_completed || d.lunch_completed)
-      );
+      const completedDuties = duties.filter((d) => {
+        const isDefaultMember = d.group_id === s.group_id;
+        const isActiveMember = d.active_student_ids && d.active_student_ids.length > 0 
+          ? d.active_student_ids.includes(s.id) 
+          : isDefaultMember;
+        return isActiveMember && (d.breakfast_completed || d.lunch_completed);
+      });
 
       const totalFoodDutyDays = completedDuties.length;
 
@@ -1378,12 +1359,12 @@ class DutyStore {
   // Reset to default seed
   public resetToSeed(): void {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(INITIAL_GROUPS));
-      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
-      localStorage.setItem(STORAGE_KEYS.COOKING, JSON.stringify(generateInitialCookingDuties()));
-      localStorage.setItem(STORAGE_KEYS.ROUNDS, JSON.stringify(INITIAL_ROUNDS));
-      localStorage.setItem(STORAGE_KEYS.IMAM_LOGS, JSON.stringify(generateInitialImamLogs(INITIAL_ROUNDS[0].id, INITIAL_ROUNDS[1].id)));
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
+      
+      
+      
+      
+      
+      
     }
     this.notify();
   }

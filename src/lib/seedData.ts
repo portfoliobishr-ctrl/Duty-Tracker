@@ -124,6 +124,8 @@ export function generateInitialCookingDuties(): CookingDuty[] {
     breakfast_completed_at: `${d3}T08:00:00.000Z`,
     lunch_completed: true,
     lunch_completed_at: `${d3}T13:00:00.000Z`,
+    active_student_ids: null,
+    is_temporary_swap: false,
     notes: 'Completed turn',
     created_at: new Date().toISOString(),
   });
@@ -140,25 +142,30 @@ export function generateInitialCookingDuties(): CookingDuty[] {
     breakfast_completed_at: `${d2}T08:00:00.000Z`,
     lunch_completed: true,
     lunch_completed_at: `${d2}T13:00:00.000Z`,
+    active_student_ids: null,
+    is_temporary_swap: false,
     notes: 'Completed turn',
     created_at: new Date().toISOString(),
   });
 
-  // Group 3: Completed turn (1 day ago - Thursday)
-  const d1 = getRelativeDateString(-1);
+  // 2026-09-11: Dilshad & Razeel completed duty
   duties.push({
-    id: `duty-${d1}`,
-    duty_date: d1,
+    id: `duty-2026-09-11`,
+    duty_date: '2026-09-11',
     group_id: 3,
     is_holiday: false,
     is_no_duty: false,
     breakfast_completed: true,
-    breakfast_completed_at: `${d1}T08:00:00.000Z`,
+    breakfast_completed_at: `2026-09-11T08:00:00.000Z`,
     lunch_completed: true,
-    lunch_completed_at: `${d1}T13:00:00.000Z`,
-    notes: 'Completed turn',
+    lunch_completed_at: `2026-09-11T13:00:00.000Z`,
+    active_student_ids: ['11111111-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000006'],
+    is_temporary_swap: false,
+    notes: 'Completed turn by Dilshad & Razeel',
     created_at: new Date().toISOString(),
   });
+
+
 
   // Today (offset 0): Friday -> NO FOOD DUTY (Morning & Evening Off)
   const d0 = getRelativeDateString(0);
@@ -173,7 +180,26 @@ export function generateInitialCookingDuties(): CookingDuty[] {
     breakfast_completed_at: null,
     lunch_completed: false,
     lunch_completed_at: null,
+    active_student_ids: null,
+    is_temporary_swap: false,
     notes: todayIsFriday ? 'Friday - No Food Duty (Morning & Evening)' : 'Scheduled Turn',
+    created_at: new Date().toISOString(),
+  });
+
+  // Yesterday (2026-09-12): Swabeeh and Shammas ALP completed duty
+  duties.push({
+    id: `duty-2026-09-12`,
+    duty_date: '2026-09-12',
+    group_id: 8,
+    is_holiday: true,
+    is_no_duty: false,
+    breakfast_completed: true,
+    breakfast_completed_at: `2026-09-12T08:00:00.000Z`,
+    lunch_completed: true,
+    lunch_completed_at: `2026-09-12T13:00:00.000Z`,
+    active_student_ids: ['11111111-0000-0000-0000-000000000013', '11111111-0000-0000-0000-000000000016'],
+    is_temporary_swap: true,
+    notes: 'Completed by Swabeeh and Shammas ALP',
     created_at: new Date().toISOString(),
   });
 
@@ -240,6 +266,31 @@ export function generateInitialImamLogs(regularRoundId: string, collegeRoundId =
     status: 'completed',
     notes: 'Round 1 turn completed',
     created_at: `${d1}T16:15:00Z`,
+  });
+
+  // Yesterday (2026-09-12): Hasir completed
+  logs.push({
+    id: 'log-asr-hasir-2026-09-12',
+    round_id: collegeRoundId,
+    date: '2026-09-12',
+    prayer_name: 'Asr',
+    student_id: '11111111-0000-0000-0000-000000000011', // Hasir
+    status: 'completed',
+    notes: 'Completed by Hasir',
+    created_at: `2026-09-12T16:15:00Z`,
+  });
+
+  // 2026-09-11: Dilshad replaced by Razeel
+  logs.push({
+    id: 'log-asr-dilshad-2026-09-11',
+    round_id: regularRoundId,
+    date: '2026-09-11',
+    prayer_name: 'Asr',
+    student_id: '11111111-0000-0000-0000-000000000005', // Dilshad
+    status: 'replaced',
+    replacement_student_id: '11111111-0000-0000-0000-000000000006', // Razeel
+    notes: 'dilshad go to his home',
+    created_at: `2026-09-11T16:15:00Z`,
   });
 
   return logs;
