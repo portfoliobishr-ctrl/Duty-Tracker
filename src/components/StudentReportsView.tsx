@@ -8,6 +8,8 @@ import {
   Search, 
   Utensils, 
   Compass, 
+  BookOpen,
+  Mic,
   Users, 
   CheckCircle2, 
   Clock,
@@ -46,7 +48,7 @@ export const StudentReportsView: React.FC = () => {
   // Aggregate stats
   const totalStudents = reports.length;
   const totalFoodDutiesCompleted = reports.reduce((acc, r) => acc + r.totalFoodDuties, 0) / 2; // 2 students per group
-  const totalAsrPrayersLed = reports.reduce((acc, r) => acc + r.totalAsrLed, 0);
+  const totalPrayersLed = reports.reduce((acc, r) => acc + r.totalPrayersLed, 0);
 
   return (
     <div className="space-y-4 max-w-lg mx-auto pb-8">
@@ -71,10 +73,10 @@ export const StudentReportsView: React.FC = () => {
         </div>
         <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs text-center">
           <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider truncate">
-            Asr Prayers
+            Prayers Led
           </span>
           <span className="text-lg font-extrabold text-emerald-600 mt-0.5 block">
-            {totalAsrPrayersLed}
+            {totalPrayersLed}
           </span>
         </div>
       </div>
@@ -150,11 +152,11 @@ export const StudentReportsView: React.FC = () => {
                   </div>
 
                   {/* Duty Counts + Chevron */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 sm:space-x-1.5">
                     {/* Food Duties Badge */}
                     <div 
                       title="Total Food Duties Completed"
-                      className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold ${
+                      className={`flex items-center space-x-1 px-2 py-1 rounded-xl border text-[11px] font-semibold ${
                         report.totalFoodDuties > 0
                           ? 'bg-orange-50/80 text-orange-800 border-orange-200/60'
                           : 'bg-slate-50 text-slate-400 border-slate-200/50'
@@ -164,10 +166,10 @@ export const StudentReportsView: React.FC = () => {
                       <span>{report.totalFoodDuties}</span>
                     </div>
 
-                    {/* Asr Prayers Led Badge */}
+                    {/* Asr Badge */}
                     <div 
                       title="Total Asr Prayers Led"
-                      className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold ${
+                      className={`flex items-center space-x-1 px-2 py-1 rounded-xl border text-[11px] font-semibold ${
                         report.totalAsrLed > 0
                           ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200/60'
                           : 'bg-slate-50 text-slate-400 border-slate-200/50'
@@ -175,6 +177,32 @@ export const StudentReportsView: React.FC = () => {
                     >
                       <Compass className="w-3.5 h-3.5 text-emerald-600" />
                       <span>{report.totalAsrLed}</span>
+                    </div>
+
+                    {/* Haddad Badge */}
+                    <div 
+                      title="Total Haddad Duties"
+                      className={`flex items-center space-x-1 px-2 py-1 rounded-xl border text-[11px] font-semibold ${
+                        report.totalHaddadLed > 0
+                          ? 'bg-blue-50/80 text-blue-800 border-blue-200/60'
+                          : 'bg-slate-50 text-slate-400 border-slate-200/50'
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{report.totalHaddadLed}</span>
+                    </div>
+
+                    {/* Isha Azaan Badge */}
+                    <div 
+                      title="Total Isha Azaan Duties"
+                      className={`flex items-center space-x-1 px-2 py-1 rounded-xl border text-[11px] font-semibold ${
+                        report.totalIshaAzaanLed > 0
+                          ? 'bg-purple-50/80 text-purple-800 border-purple-200/60'
+                          : 'bg-slate-50 text-slate-400 border-slate-200/50'
+                      }`}
+                    >
+                      <Mic className="w-3.5 h-3.5 text-purple-600" />
+                      <span>{report.totalIshaAzaanLed}</span>
                     </div>
 
                     {/* Navigation Chevron */}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CookingDuty, ImamLog, Student, Group, StudentImamStats } from '@/types/database';
+import { CookingDuty, ImamLog, Student, Group, StudentReport } from '@/types/database';
 import { dutyStore } from '@/lib/dutyStore';
 import { History, Search, Coffee, Utensils, CheckCircle2, Award, Clock } from 'lucide-react';
 
@@ -12,7 +12,7 @@ export const HistoryAuditView: React.FC = () => {
   const [imamLogs, setImamLogs] = useState<ImamLog[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<(Group & { members: Student[] })[]>([]);
-  const [imamStats, setImamStats] = useState<StudentImamStats[]>([]);
+  const [reports, setReports] = useState<StudentReport[]>([]);
   const [mounted, setMounted] = useState(false);
 
   const loadData = () => {
@@ -20,7 +20,7 @@ export const HistoryAuditView: React.FC = () => {
     setImamLogs(dutyStore.getImamLogs());
     setStudents(dutyStore.getStudents());
     setGroups(dutyStore.getGroupsWithMembers());
-    setImamStats(dutyStore.getImamStats().stats);
+    setReports(dutyStore.getStudentReports());
   };
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export const HistoryAuditView: React.FC = () => {
     })
     .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
-  const sortedLeaderboard = [...imamStats].sort((a, b) => b.allTimeLedCount - a.allTimeLedCount);
+  const sortedLeaderboard = [...reports].sort((a, b) => b.totalPrayersLed - a.totalPrayersLed);
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto pb-8">
@@ -270,7 +270,7 @@ export const HistoryAuditView: React.FC = () => {
 
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
-                  {item.allTimeLedCount} prayers led
+                  {item.totalPrayersLed} prayers led
                 </span>
                 {item.hasLedCurrentRound && (
                   <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md">

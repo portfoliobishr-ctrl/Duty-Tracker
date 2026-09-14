@@ -1,6 +1,6 @@
 export type MealType = 'breakfast' | 'lunch';
 export type DutyStatus = 'pending' | 'completed' | 'missed';
-export type PrayerSlotName = 'Asr';
+export type PrayerSlotName = 'Asr' | 'Haddad' | 'Isha_Azaan';
 export type ImamLogStatus = 'completed' | 'replaced' | 'external_imam' | 'none' | 'led' | 'absent_replaced';
 export type RoundStatus = 'active' | 'completed';
 export type PoolType = 'regular' | 'college';
@@ -56,6 +56,7 @@ export interface ImamRound {
   id: string;
   round_number: number;
   pool: PoolType; // 'regular' (Pool A, 10 students) or 'college' (Pool B, 6 students)
+  duty_type: PrayerSlotName;
   status: RoundStatus;
   started_at?: string;
   completed_at?: string | null;
@@ -101,7 +102,10 @@ export interface StudentReport {
   group: Group;
   totalFoodDuties: number; // total meals completed by their group
   totalFoodDutyDays: number; // total days their group completed cooking
-  totalAsrLed: number; // total times student led Asr prayer
+  totalPrayersLed: number; // total times student led any prayer
+  totalAsrLed: number;
+  totalHaddadLed: number;
+  totalIshaAzaanLed: number;
   replacedCount: number; // times they served as replacement/substitute
   hasLedCurrentRound: boolean;
   isNextAsrCandidate: boolean;

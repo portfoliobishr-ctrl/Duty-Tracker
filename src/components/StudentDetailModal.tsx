@@ -38,9 +38,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   const history = dutyStore.getStudentDutyHistory(studentId);
   if (!history) return null;
 
-  const { student, group, cookingHistory, imamHistory, totalFoodDuties, totalAsrLed } = history;
+  const { student, group, cookingHistory, imamHistory, totalFoodDuties, totalPrayersLed } = history;
   const isCollege = student.group_id >= 6;
-  const hasAnyRecords = totalFoodDuties > 0 || totalAsrLed > 0;
+  const hasAnyRecords = totalFoodDuties > 0 || totalPrayersLed > 0;
 
   const formatDate = (dateStr: string) => {
     const parts = dateStr.split('-');
@@ -126,14 +126,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             </div>
             <div>
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Asr Imam
+                Prayers Led
               </span>
               <div className="flex items-baseline space-x-1 mt-0.5">
                 <span className="text-xl font-extrabold text-emerald-600">
-                  {totalAsrLed}
+                  {totalPrayersLed}
                 </span>
                 <span className="text-xs font-medium text-slate-400">
-                  {totalAsrLed === 1 ? 'prayer' : 'prayers'}
+                  {totalPrayersLed === 1 ? 'prayer' : 'prayers'}
                 </span>
               </div>
             </div>
@@ -153,7 +153,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 No duty records logged yet.
               </h4>
               <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                Completed cooking duties or Asr prayers led by {student.name} will appear here automatically.
+                Completed cooking duties or prayers led by {student.name} will appear here automatically.
               </p>
             </div>
           ) : (
@@ -224,78 +224,85 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 )}
               </section>
 
-              {/* SECTION 2: Asr Imam History */}
-              <section className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Compass className="w-4 h-4 text-emerald-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Asr Imam History
-                    </h4>
-                  </div>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/50">
-                    {totalAsrLed} led
-                  </span>
-                </div>
+              {/* PRAYER DUTY SECTIONS */}
+              {['Asr', 'Haddad', 'Isha_Azaan'].map((dutyName) => {
+                const logs = imamHistory.filter((item) => item.prayer_name === dutyName);
+                const displayName = dutyName.replace('_', ' ');
+                
+                return (
+                  <section key={dutyName} className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Compass className="w-4 h-4 text-emerald-600" />
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          {displayName} Duty History
+                        </h4>
+                      </div>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/50">
+                        {logs.length} led
+                      </span>
+                    </div>
 
-                {imamHistory.length > 0 ? (
-                  <div className="bg-white rounded-2xl border border-slate-200/80 divide-y divide-slate-100 shadow-2xs overflow-hidden">
-                    {imamHistory.map((item) => {
-                      return (
-                        <div key={item.id} className="p-3 flex items-center justify-between hover:bg-slate-50/60 transition-colors">
-                          <div className="flex items-start space-x-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                              <Calendar className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <div className="text-xs font-bold text-slate-900">
-                                {formatDate(item.date)}
+                    {logs.length > 0 ? (
+                      <div className="bg-white rounded-2xl border border-slate-200/80 divide-y divide-slate-100 shadow-2xs overflow-hidden">
+                        {logs.map((item) => {
+                          return (
+                            <div key={item.id} className="p-3 flex items-center justify-between hover:bg-slate-50/60 transition-colors">
+                              <div className="flex items-start space-x-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                                  <Calendar className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-slate-900">
+                                    {formatDate(item.date)}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 mt-0.5">
+                                    {item.roleType === 'substitute' && item.originalStudentName ? (
+                                      <span className="text-amber-700 font-medium">
+                                        Substituted for {item.originalStudentName}
+                                      </span>
+                                    ) : item.notes ? (
+                                      <span>{item.notes}</span>
+                                    ) : (
+                                      <span>{displayName} Duty</span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-[11px] text-slate-400 mt-0.5">
-                                {item.roleType === 'substitute' && item.originalStudentName ? (
-                                  <span className="text-amber-700 font-medium">
-                                    Substituted for {item.originalStudentName}
+
+                              {/* Role Tag */}
+                              <div>
+                                {item.roleType === 'regular' && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                    <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
+                                    Regular Rotation
                                   </span>
-                                ) : item.notes ? (
-                                  <span>{item.notes}</span>
-                                ) : (
-                                  <span>Asr Congregation Prayer</span>
+                                )}
+                                {item.roleType === 'holiday' && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
+                                    <Sparkles className="w-3 h-3 mr-1 text-amber-600" />
+                                    Holiday Rotation
+                                  </span>
+                                )}
+                                {item.roleType === 'substitute' && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
+                                    <UserCheck className="w-3 h-3 mr-1 text-purple-600" />
+                                    Substitute
+                                  </span>
                                 )}
                               </div>
                             </div>
-                          </div>
-
-                          {/* Role Tag */}
-                          <div>
-                            {item.roleType === 'regular' && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
-                                Regular Rotation
-                              </span>
-                            )}
-                            {item.roleType === 'holiday' && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
-                                <Sparkles className="w-3 h-3 mr-1 text-amber-600" />
-                                Holiday Rotation
-                              </span>
-                            )}
-                            {item.roleType === 'substitute' && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
-                                <UserCheck className="w-3 h-3 mr-1 text-purple-600" />
-                                Substitute
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                    No Asr prayer duties led yet.
-                  </div>
-                )}
-              </section>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        No {displayName} duties led yet.
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </>
           )}
 

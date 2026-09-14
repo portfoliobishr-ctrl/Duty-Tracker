@@ -14,6 +14,7 @@ import {
   PoolStats,
   StudentReport,
   DailyImamState,
+  PrayerSlotName,
 } from '@/types/database';
 import {
   INITIAL_GROUPS,
@@ -88,6 +89,11 @@ class DutyStore {
       }
 
       if (groups && groups.length > 0) this.state.groups = groups;
+      if (students && students.length > 0) this.state.students = students;
+      if (cooking && cooking.length > 0) this.state.cooking_duties = cooking;
+      if (rounds && rounds.length > 0) this.state.rounds = rounds;
+      if (logs && logs.length > 0) this.state.imam_logs = logs;
+      if (settings && settings.length > 0) this.state.settings = settings[0];
                                     
       this.state.isInitialized = true;
       this.setupRealtimeSubscriptions();
@@ -240,8 +246,8 @@ class DutyStore {
       this.notify();
 
       if (isSupabaseConfigured() && supabase) {
-        supabase.from('students').update({ group_id: sOut.group_id }).eq('id', sOut.id);
-        supabase.from('students').update({ group_id: sIn.group_id }).eq('id', sIn.id);
+        supabase.from('students').update({ group_id: sOut.group_id }).eq('id', sOut.id).then(r => r.error && console.error(r.error));
+        supabase.from('students').update({ group_id: sIn.group_id }).eq('id', sIn.id).then(r => r.error && console.error(r.error));
       }
     } else {
       // Temporary: Override for a specific CookingDuty
@@ -271,6 +277,7 @@ class DutyStore {
 
       if (isSupabaseConfigured() && supabase) {
         supabase.from('cooking_duties').upsert({
+          id: duty.id,
           duty_date: duty.duty_date,
           group_id: duty.group_id,
           is_holiday: duty.is_holiday,
@@ -281,7 +288,7 @@ class DutyStore {
           active_student_ids: duty.active_student_ids,
           is_temporary_swap: duty.is_temporary_swap,
           notes: duty.notes,
-        }, { onConflict: 'duty_date' });
+        }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
       }
     }
   }
@@ -301,7 +308,7 @@ class DutyStore {
       supabase.from('cooking_duties').update({
         active_student_ids: null,
         is_temporary_swap: false
-      }).eq('id', duty.id);
+      }).eq('id', duty.id).then(r => r.error && console.error(r.error));
     }
   }
 
@@ -393,7 +400,7 @@ class DutyStore {
           name: params.name,
           is_holiday_only: params.is_holiday_only,
           description: params.description ?? groups[groupIdx].description,
-        }).eq('id', groupId);
+        }).eq('id', groupId).then(r => r.error && console.error(r.error));
       }
     }
 
@@ -408,7 +415,7 @@ class DutyStore {
         if (isSupabaseConfigured() && supabase) {
           supabase.from('students').update({
             name: m.name.trim(),
-          }).eq('id', m.id);
+          }).eq('id', m.id).then(r => r.error && console.error(r.error));
         }
       }
     });
@@ -419,29 +426,30 @@ class DutyStore {
   }
 
   // --- EVENT-DRIVEN QUEUE ADVANCEMENT ---
-  // Determines the active cooking group strictly based on the last recorded completed duty
-  public getActiveCookingGroup(isHoliday: boolean): number {
+  // Determines the active cooking group based on the sequence of past assigned duties
+  public getActiveCookingGroup(isHoliday: boolean, upToDateStr?: string): number {
     const duties = this.getCookingDuties();
 
-    // Find duties that have at least one meal completed
-    const completed = duties.filter(
-      (d) => !d.is_no_duty && d.group_id !== null && (d.breakfast_completed || d.lunch_completed)
+    // Find past assigned duties up to the given date to determine the next group in the sequence
+    const pastDuties = duties.filter(
+      (d) => !d.is_no_duty && d.group_id !== null && 
+             (!upToDateStr || d.duty_date < upToDateStr)
     );
 
     if (isHoliday) {
-      const holidayCompleted = completed
+      const holidayPast = pastDuties
         .filter((d) => d.is_holiday && d.group_id !== null && d.group_id >= 6 && d.group_id <= 8)
         .sort((a, b) => a.duty_date.localeCompare(b.duty_date));
-      const last = holidayCompleted[holidayCompleted.length - 1];
+      const last = holidayPast[holidayPast.length - 1];
       if (last && last.group_id) {
         return 6 + ((last.group_id - 6 + 1) % 3);
       }
       return 6; // Initial starting group for college pool (Group 6)
     } else {
-      const regularCompleted = completed
+      const regularPast = pastDuties
         .filter((d) => !d.is_holiday && d.group_id !== null && d.group_id >= 1 && d.group_id <= 5)
         .sort((a, b) => a.duty_date.localeCompare(b.duty_date));
-      const last = regularCompleted[regularCompleted.length - 1];
+      const last = regularPast[regularPast.length - 1];
       if (last && last.group_id) {
         return 1 + ((last.group_id - 1 + 1) % 5);
       }
@@ -486,7 +494,7 @@ class DutyStore {
 
     const settings = this.getSystemSettings();
     const isHoliday = isHolidayOrSunday(dateStr, settings.default_holidays);
-    const activeGroup = this.getActiveCookingGroup(isHoliday);
+    const activeGroup = this.getActiveCookingGroup(isHoliday, dateStr);
 
     if (duty) {
       // If duty has already been completed or manually overridden, keep it intact
@@ -573,6 +581,7 @@ class DutyStore {
 
     if (isSupabaseConfigured() && supabase) {
       supabase.from('cooking_duties').upsert({
+        id: duty.id,
         duty_date: duty.duty_date,
         group_id: duty.group_id,
         is_holiday: duty.is_holiday,
@@ -583,7 +592,7 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' });
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
     }
 
     return duty;
@@ -608,6 +617,7 @@ class DutyStore {
 
     if (isSupabaseConfigured() && supabase) {
       supabase.from('cooking_duties').upsert({
+        id: duty.id,
         duty_date: duty.duty_date,
         group_id: duty.group_id,
         is_holiday: duty.is_holiday,
@@ -618,10 +628,62 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' });
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
     }
 
     return duty;
+  }
+
+  public forceNextCookingGroup() {
+    const today = getRelativeDateString(0);
+    const duties = this.getCookingDuties();
+    
+    // Find the first duty from today onwards that hasn't been completed
+    const targetIdx = duties.findIndex(d => d.duty_date >= today && !d.is_no_duty && d.group_id !== null && (!d.breakfast_completed && !d.lunch_completed && !d.notes?.includes('Manual override')));
+    if (targetIdx === -1) return;
+
+    const targetDuty = duties[targetIdx];
+    if (!targetDuty.group_id) return;
+
+    // advance group
+    const isCollege = targetDuty.is_holiday;
+    const nextGroup = isCollege 
+        ? (targetDuty.group_id >= 6 && targetDuty.group_id <= 8 ? 6 + ((targetDuty.group_id - 6 + 1) % 3) : 6)
+        : (targetDuty.group_id >= 1 && targetDuty.group_id <= 5 ? 1 + ((targetDuty.group_id - 1 + 1) % 5) : 1);
+
+    targetDuty.group_id = nextGroup;
+    targetDuty.notes = "Manual override - Skipped previous group";
+    
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('cooking_duties').upsert({
+        id: targetDuty.id,
+        duty_date: targetDuty.duty_date,
+        group_id: targetDuty.group_id,
+        is_holiday: targetDuty.is_holiday,
+        is_no_duty: targetDuty.is_no_duty,
+        breakfast_completed: targetDuty.breakfast_completed,
+        breakfast_completed_at: targetDuty.breakfast_completed_at,
+        lunch_completed: targetDuty.lunch_completed,
+        lunch_completed_at: targetDuty.lunch_completed_at,
+        active_student_ids: targetDuty.active_student_ids || null,
+        is_temporary_swap: targetDuty.is_temporary_swap || false,
+        notes: targetDuty.notes,
+      }, { onConflict: 'duty_date' }).then();
+    }
+
+    // Delete future uncompleted duties so they get regenerated correctly
+    const futureDuties = duties.slice(targetIdx + 1).filter(d => !d.breakfast_completed && !d.lunch_completed && !d.notes?.includes('Manual override'));
+    
+    if (futureDuties.length > 0) {
+       this.state.cooking_duties = this.state.cooking_duties.filter(d => !futureDuties.includes(d));
+       if (isSupabaseConfigured() && supabase) {
+         const futureIds = futureDuties.map(d => d.id);
+         supabase.from('cooking_duties').delete().in('id', futureIds).then();
+       }
+    }
+
+    this.notify();
+    this.ensureDutiesRange(); // regenerate future duties
   }
 
   public setNoFoodDuty(dateStr: string, isNoDuty: boolean): CookingDuty {
@@ -653,6 +715,7 @@ class DutyStore {
 
     if (isSupabaseConfigured() && supabase) {
       supabase.from('cooking_duties').upsert({
+        id: duty.id,
         duty_date: duty.duty_date,
         group_id: duty.group_id,
         is_holiday: duty.is_holiday,
@@ -663,7 +726,7 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' });
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
     }
 
     return duty;
@@ -694,6 +757,7 @@ class DutyStore {
 
     if (isSupabaseConfigured() && supabase) {
       supabase.from('cooking_duties').upsert({
+        id: duty.id,
         duty_date: duty.duty_date,
         group_id: duty.group_id,
         is_holiday: duty.is_holiday,
@@ -704,7 +768,7 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' });
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
     }
 
     return duty;
@@ -732,17 +796,28 @@ class DutyStore {
     });
   }
 
+  // Get Unified Pool (All Students), sorted by imam_order then name
+  public getUnifiedStudents(): Student[] {
+    const students = this.getStudents().filter((s) => s.is_active);
+    return students.sort((a, b) => {
+      const oa = a.imam_order ?? 999;
+      const ob = b.imam_order ?? 999;
+      return oa !== ob ? oa - ob : a.name.localeCompare(b.name);
+    });
+  }
+
   // Get active round for a specific pool
-  public getActiveRound(pool: PoolType): ImamRound {
+  public getActiveRound(pool: PoolType, dutyType: PrayerSlotName = 'Asr'): ImamRound {
     const rounds = this.getImamRounds();
-    let active = rounds.find((r) => r.pool === pool && r.status === 'active');
+    let active = rounds.find((r) => r.pool === pool && r.duty_type === dutyType && r.status === 'active');
     if (active) return active;
 
-    const poolRounds = rounds.filter((r) => r.pool === pool);
+    const poolRounds = rounds.filter((r) => r.pool === pool && r.duty_type === dutyType);
     const newRound: ImamRound = {
       id: crypto.randomUUID ? crypto.randomUUID() : `round-${pool}-${Date.now()}`,
       round_number: poolRounds.length + 1,
       pool,
+      duty_type: dutyType,
       status: 'active',
       started_at: new Date().toISOString(),
       completed_at: null,
@@ -754,7 +829,7 @@ class DutyStore {
   }
 
   // Get assigned Asr Imam candidate for a date based on day type (Sunday / Holiday -> Pool B, Weekday -> Pool A)
-  public getAssignedAsrImam(dateStr: string): {
+  public getAssignedDutyStudent(dateStr: string, dutyType: PrayerSlotName = 'Asr'): {
     student: Student | null;
     pool: PoolType;
     isHoliday: boolean;
@@ -766,10 +841,15 @@ class DutyStore {
     const settings = this.getSystemSettings();
     const isHoliday = duty.is_holiday || isHolidayOrSunday(dateStr, settings.default_holidays);
 
-    const pool: PoolType = isHoliday ? 'college' : 'regular';
-    const activeRound = this.getActiveRound(pool);
-    const poolStudents = pool === 'college' ? this.getPoolBStudents() : this.getPoolAStudents();
-    const logs = this.getImamLogs().filter((l) => l.round_id === activeRound.id && l.prayer_name === 'Asr');
+    const pool: PoolType = dutyType === 'Asr' ? (isHoliday ? 'college' : 'regular') : 'regular';
+    const activeRound = this.getActiveRound(pool, dutyType);
+    let poolStudents: Student[];
+    if (dutyType === 'Asr') {
+      poolStudents = pool === 'college' ? this.getPoolBStudents() : this.getPoolAStudents();
+    } else {
+      poolStudents = this.getUnifiedStudents();
+    }
+    const logs = this.getImamLogs().filter((l) => l.round_id === activeRound.id && l.prayer_name === dutyType);
 
     const completedStudentIds = new Set<string>();
     logs.forEach((l) => {
@@ -794,8 +874,9 @@ class DutyStore {
     };
   }
 
-  // Log Asr Prayer Congregation
-  public logAsrDuty(params: {
+  // Log Duty (Asr, Haddad, Isha Azaan)
+  public logDuty(params: {
+    prayerName?: PrayerSlotName;
     date: string;
     studentId?: string | null;
     status: ImamLogStatus;
@@ -813,21 +894,25 @@ class DutyStore {
     // Determine target pool from student ID or date
     const targetStudentId = params.studentId || params.replacementStudentId;
     const targetStudent = targetStudentId ? students.find((s) => s.id === targetStudentId) : null;
+    const dutyType = params.prayerName || 'Asr';
+    
     let pool: PoolType = 'regular';
-    if (targetStudent) {
-      pool = targetStudent.group_id >= 6 ? 'college' : 'regular';
-    } else {
-      const duty = this.ensureDutyForDate(params.date);
-      pool = duty.is_holiday ? 'college' : 'regular';
+    if (dutyType === 'Asr') {
+      if (targetStudent) {
+        pool = targetStudent.group_id >= 6 ? 'college' : 'regular';
+      } else {
+        const duty = this.ensureDutyForDate(params.date);
+        pool = duty.is_holiday ? 'college' : 'regular';
+      }
     }
 
-    const activeRound = this.getActiveRound(pool);
+    const activeRound = this.getActiveRound(pool, dutyType);
 
     const newLog: ImamLog = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `log-asr-${Date.now()}`,
+      id: crypto.randomUUID ? crypto.randomUUID() : `log-${dutyType}-${Date.now()}`,
       round_id: activeRound.id,
       date: params.date,
-      prayer_name: 'Asr',
+      prayer_name: dutyType,
       student_id: params.status === 'external_imam' || params.status === 'none' ? null : (params.studentId || null),
       status: params.status,
       replacement_student_id: (params.status === 'replaced' || params.status === 'absent_replaced') ? (params.replacementStudentId || null) : null,
@@ -849,7 +934,7 @@ class DutyStore {
     let newRound: ImamRound | undefined;
 
     const poolStudents = pool === 'college' ? this.getPoolBStudents() : this.getPoolAStudents();
-    const poolRoundLogs = logs.filter((l) => l.round_id === activeRound.id && l.prayer_name === 'Asr');
+    const poolRoundLogs = logs.filter((l) => l.round_id === activeRound.id && l.prayer_name === dutyType);
 
     const completedStudentIds = new Set<string>();
     poolRoundLogs.forEach((l) => {
@@ -870,15 +955,17 @@ class DutyStore {
         id: crypto.randomUUID ? crypto.randomUUID() : `round-${pool}-${Date.now()}`,
         round_number: activeRound.round_number + 1,
         pool,
+        duty_type: dutyType,
         status: 'active',
         started_at: now,
         completed_at: null,
         created_at: now,
       };
 
-      allRounds.push(newRound);
+      if (newRound) {
+        allRounds.push(newRound);
+      }
 
-      
     }
 
     this.notify();
@@ -888,40 +975,74 @@ class DutyStore {
         id: newLog.id,
         round_id: newLog.round_id,
         date: newLog.date,
-        prayer_name: 'Asr',
+        prayer_name: dutyType,
         student_id: newLog.student_id,
         status: newLog.status,
         replacement_student_id: newLog.replacement_student_id,
         notes: newLog.notes,
-      });
+      }).then(r => r.error && console.error(r.error));
 
       if (roundAdvanced && newRound) {
-        supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id);
+        supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id).then(r => r.error && console.error(r.error));
         supabase.from('imam_rounds').insert({
           id: newRound.id,
           round_number: newRound.round_number,
           pool: newRound.pool,
+          duty_type: newRound.duty_type,
           status: 'active',
           started_at: newRound.started_at,
-        });
+        }).then(r => r.error && console.error(r.error));
       }
     }
 
     return { log: newLog, roundAdvanced, newRound };
   }
 
+  public forceNextRound(pool: PoolType, dutyType: PrayerSlotName) {
+    const activeRound = this.getActiveRound(pool, dutyType);
+    const now = new Date().toISOString();
+    activeRound.status = 'completed';
+    activeRound.completed_at = now;
+
+    const newRound: ImamRound = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `round-${pool}-${Date.now()}`,
+      round_number: activeRound.round_number + 1,
+      pool,
+      duty_type: dutyType,
+      status: 'active',
+      started_at: now,
+      completed_at: null,
+      created_at: now,
+    };
+    this.getImamRounds().push(newRound);
+    this.notify();
+
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('imam_rounds').update({ status: 'completed', completed_at: now }).eq('id', activeRound.id).then(r => r.error && console.error(r.error));
+      supabase.from('imam_rounds').insert({
+        id: newRound.id,
+        round_number: newRound.round_number,
+        pool: newRound.pool,
+        duty_type: newRound.duty_type,
+        status: 'active',
+        started_at: newRound.started_at,
+      }).then(r => r.error && console.error(r.error));
+    }
+  }
+
   // Toggle student turn manually in their active pool round
-  public toggleStudentRoundTurn(studentId: string, turnCompleted: boolean): void {
+  public toggleStudentRoundTurn(studentId: string, turnCompleted: boolean, dutyType: PrayerSlotName = 'Asr'): void {
     const students = this.getStudents();
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
     const pool: PoolType = student.group_id >= 6 ? 'college' : 'regular';
-    const activeRound = this.getActiveRound(pool);
+    const activeRound = this.getActiveRound(pool, dutyType);
     const logs = this.getImamLogs();
 
     if (turnCompleted) {
-      this.logAsrDuty({
+      this.logDuty({
+        prayerName: dutyType,
         date: getRelativeDateString(0),
         status: 'completed',
         studentId,
@@ -937,15 +1058,15 @@ class DutyStore {
   }
 
   // Get statistics for both pools
-  public getDualPoolStats(): {
+  public getDualPoolStats(dutyType: PrayerSlotName = 'Asr'): {
     poolA: PoolStats;
     poolB: PoolStats;
   } {
-    const logs = this.getImamLogs().filter((l) => l.prayer_name === 'Asr');
+    const logs = this.getImamLogs().filter((l) => l.prayer_name === dutyType);
 
     // Helper to compute pool stats
     const computePool = (pool: PoolType, title: string, students: Student[]): PoolStats => {
-      const activeRound = this.getActiveRound(pool);
+      const activeRound = this.getActiveRound(pool, dutyType);
       const roundLogs = logs.filter((l) => l.round_id === activeRound.id);
 
       const completedIds = new Set<string>();
@@ -1000,8 +1121,8 @@ class DutyStore {
       };
     };
 
-    const poolA = computePool('regular', 'Pool A: Regular Students (Working Days)', this.getPoolAStudents());
-    const poolB = computePool('college', 'Pool B: College Students (Holidays/Sundays)', this.getPoolBStudents());
+    const poolA = computePool('regular', dutyType === 'Asr' ? 'Pool A: Regular Students (Working Days)' : 'All Students (Unified Rotation)', dutyType === 'Asr' ? this.getPoolAStudents() : this.getUnifiedStudents());
+    const poolB = dutyType === 'Asr' ? computePool('college', 'Pool B: College Students (Holidays/Sundays)', this.getPoolBStudents()) : null as any;
 
     return { poolA, poolB };
   }
@@ -1026,14 +1147,14 @@ class DutyStore {
 
   // Compatibility method for legacy logPrayer callers
   public logPrayer(params: {
-    prayerName?: string;
+    prayerName?: PrayerSlotName;
     date: string;
     status: ImamLogStatus;
     studentId?: string | null;
     replacementStudentId?: string | null;
     notes?: string;
   }) {
-    return this.logAsrDuty(params);
+    return this.logDuty(params);
   }
 
   // --- INDIVIDUAL STUDENT DUTY REPORTS ---
@@ -1041,25 +1162,26 @@ class DutyStore {
     const students = this.getStudents();
     const groups = this.getGroups();
     const duties = this.getCookingDuties();
-    const logs = this.getImamLogs().filter((l) => l.prayer_name === 'Asr');
+    const allLogs = this.getImamLogs();
+    const asrLogs = allLogs.filter((l) => l.prayer_name === 'Asr');
 
     const groupMap = new Map<number, Group>();
     groups.forEach((g) => groupMap.set(g.id, g));
 
     const todayDate = getRelativeDateString(0);
-    const assignedAsr = this.getAssignedAsrImam(todayDate);
+    const assignedAsr = this.getAssignedDutyStudent(todayDate, 'Asr');
 
     const activeRoundRegular = this.getActiveRound('regular');
     const activeRoundCollege = this.getActiveRound('college');
 
     const regularCompletedIds = new Set<string>();
-    logs.filter((l) => l.round_id === activeRoundRegular.id).forEach((l) => {
+    asrLogs.filter((l) => l.round_id === activeRoundRegular.id).forEach((l) => {
       if ((l.status === 'completed' || l.status === 'led') && l.student_id) regularCompletedIds.add(l.student_id);
       if ((l.status === 'replaced' || l.status === 'absent_replaced') && l.replacement_student_id) regularCompletedIds.add(l.replacement_student_id);
     });
 
     const collegeCompletedIds = new Set<string>();
-    logs.filter((l) => l.round_id === activeRoundCollege.id).forEach((l) => {
+    asrLogs.filter((l) => l.round_id === activeRoundCollege.id).forEach((l) => {
       if ((l.status === 'completed' || l.status === 'led') && l.student_id) collegeCompletedIds.add(l.student_id);
       if ((l.status === 'replaced' || l.status === 'absent_replaced') && l.replacement_student_id) collegeCompletedIds.add(l.replacement_student_id);
     });
@@ -1081,13 +1203,13 @@ class DutyStore {
 
       const totalFoodDutyDays = completedDuties.length;
 
-      const ledLogs = logs.filter(
+      const ledLogs = allLogs.filter(
         (l) =>
         ((l.student_id === s.id && (l.status === 'completed' || l.status === 'led')) ||
           (l.replacement_student_id === s.id && (l.status === 'replaced' || l.status === 'absent_replaced')))
       );
 
-      const replacedLogs = logs.filter(
+      const replacedLogs = allLogs.filter(
         (l) => (l.status === 'replaced' || l.status === 'absent_replaced') && l.student_id === s.id
       );
 
@@ -1096,6 +1218,11 @@ class DutyStore {
         ? collegeCompletedIds.has(s.id)
         : regularCompletedIds.has(s.id);
 
+      const totalPrayersLed = ledLogs.length;
+      const totalAsrLed = ledLogs.filter(l => l.prayer_name === 'Asr').length;
+      const totalHaddadLed = ledLogs.filter(l => l.prayer_name === 'Haddad').length;
+      const totalIshaAzaanLed = ledLogs.filter(l => l.prayer_name === 'Isha_Azaan').length;
+      
       const isNextAsrCandidate = assignedAsr.student?.id === s.id;
 
       return {
@@ -1103,10 +1230,13 @@ class DutyStore {
         group,
         totalFoodDuties: totalFoodDutyDays,
         totalFoodDutyDays,
-        totalAsrLed: ledLogs.length,
+        totalPrayersLed,
+        totalAsrLed,
+        totalHaddadLed,
+        totalIshaAzaanLed,
         replacedCount: replacedLogs.length,
         hasLedCurrentRound,
-        isNextAsrCandidate,
+        isNextAsrCandidate: false, // We'll compute this separately if needed
       };
     }).sort((a, b) => {
       // Sort by pool first (regular before college), then by imam_order within each pool
@@ -1132,8 +1262,9 @@ class DutyStore {
     const settings = this.getSystemSettings();
 
     // Start projections from the currently active uncompleted groups
-    let nextReg = this.getActiveCookingGroup(false);
-    let nextHol = this.getActiveCookingGroup(true);
+    // Start projections from the currently active uncompleted groups
+    let nextReg = this.getActiveCookingGroup(false, today);
+    let nextHol = this.getActiveCookingGroup(true, today);
 
     const queueItems: {
       duty: CookingDuty;
@@ -1180,6 +1311,12 @@ class DutyStore {
 
       if (existing && (existing.breakfast_completed || existing.lunch_completed || existing.notes?.includes('Manual override')) && existing.group_id) {
         assignedId = existing.group_id;
+        // Update the running pointer so sequence continues from this duty
+        if (isHoliday) {
+          nextHol = assignedId;
+        } else {
+          nextReg = assignedId;
+        }
       } else {
         assignedId = isHoliday ? nextHol : nextReg;
       }
@@ -1318,12 +1455,12 @@ class DutyStore {
       cookingHistory,
       imamHistory,
       totalFoodDuties: cookingHistory.length,
-      totalAsrLed: imamHistory.length,
+      totalPrayersLed: imamHistory.length,
     };
   }
 
-  // --- UPCOMING ASR IMAMS QUEUE (ALPHABETICAL) ---
-  public getUpcomingAsrQueue(targetPool?: PoolType): {
+  // --- UPCOMING IMAM QUEUE (ALPHABETICAL) ---
+  public getUpcomingQueue(dutyType: PrayerSlotName, targetPool?: PoolType): {
     pool: PoolType;
     round: ImamRound;
     queue: {
@@ -1333,10 +1470,13 @@ class DutyStore {
       orderIndex: number;
     }[];
   } {
-    const pool = targetPool || 'regular';
-    const activeRound = this.getActiveRound(pool);
-    const poolStudents = pool === 'college' ? this.getPoolBStudents() : this.getPoolAStudents();
-    const logs = this.getImamLogs().filter((l) => l.round_id === activeRound.id && l.prayer_name === 'Asr');
+    const pool = dutyType === 'Asr' ? (targetPool || 'regular') : 'regular';
+    const activeRound = this.getActiveRound(pool, dutyType);
+    const poolStudents = dutyType === 'Asr' 
+      ? (pool === 'college' ? this.getPoolBStudents() : this.getPoolAStudents())
+      : this.getUnifiedStudents();
+      
+    const logs = this.getImamLogs().filter((l) => l.round_id === activeRound.id && l.prayer_name === dutyType);
 
     const completedIds = new Set<string>();
     logs.forEach((l) => {

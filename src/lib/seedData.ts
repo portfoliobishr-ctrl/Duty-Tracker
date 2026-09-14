@@ -55,9 +55,11 @@ export const INITIAL_STUDENTS: Student[] = [
   { id: '11111111-0000-0000-0000-000000000016', name: 'Swabeeh',     group_id: 8, is_active: true, imam_order: 4 },
 ];
 
-// Single Congregational Prayer: Asr Only
+// Prayer & Duty Slots
 export const INITIAL_PRAYER_SLOTS: PrayerSlot[] = [
   { id: 1, name: 'Asr', display_order: 1 },
+  { id: 2, name: 'Haddad', display_order: 2 },
+  { id: 3, name: 'Isha_Azaan', display_order: 3 },
 ];
 
 // Initial active rounds for both pools
@@ -66,6 +68,7 @@ export const INITIAL_ROUNDS: ImamRound[] = [
     id: '22222222-0000-0000-0000-000000000001',
     round_number: 1,
     pool: 'regular',
+    duty_type: 'Asr',
     status: 'active',
     started_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     completed_at: null,
@@ -75,6 +78,27 @@ export const INITIAL_ROUNDS: ImamRound[] = [
     id: '22222222-0000-0000-0000-000000000002',
     round_number: 1,
     pool: 'college',
+    duty_type: 'Asr',
+    status: 'active',
+    started_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    completed_at: null,
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+  },
+  {
+    id: '22222222-0000-0000-0000-000000000003',
+    round_number: 1,
+    pool: 'regular',
+    duty_type: 'Haddad',
+    status: 'active',
+    started_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    completed_at: null,
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+  },
+  {
+    id: '22222222-0000-0000-0000-000000000004',
+    round_number: 1,
+    pool: 'regular',
+    duty_type: 'Isha_Azaan',
     status: 'active',
     started_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     completed_at: null,
@@ -186,7 +210,7 @@ export function generateInitialCookingDuties(): CookingDuty[] {
     created_at: new Date().toISOString(),
   });
 
-  // Yesterday (2026-09-12): Swabeeh and Shammas ALP completed duty
+  // 2026-09-12: Swabeeh and Shammas ALP completed duty
   duties.push({
     id: `duty-2026-09-12`,
     duty_date: '2026-09-12',
@@ -203,6 +227,40 @@ export function generateInitialCookingDuties(): CookingDuty[] {
     created_at: new Date().toISOString(),
   });
 
+  // 2026-09-13: Hasir and Murshid completed duty
+  duties.push({
+    id: `duty-2026-09-13`,
+    duty_date: '2026-09-13',
+    group_id: 6,
+    is_holiday: true,
+    is_no_duty: false,
+    breakfast_completed: true,
+    breakfast_completed_at: `2026-09-13T08:00:00.000Z`,
+    lunch_completed: true,
+    lunch_completed_at: `2026-09-13T13:00:00.000Z`,
+    active_student_ids: ['11111111-0000-0000-0000-000000000011', '11111111-0000-0000-0000-000000000015'],
+    is_temporary_swap: true,
+    notes: 'Completed by Hasir and Murshid',
+    created_at: new Date().toISOString(),
+  });
+
+  // 2026-09-09: Swabah and Muhammed completed duty
+  duties.push({
+    id: `duty-2026-09-09`,
+    duty_date: '2026-09-09',
+    group_id: 2,
+    is_holiday: false,
+    is_no_duty: false,
+    breakfast_completed: true,
+    breakfast_completed_at: `2026-09-09T08:00:00.000Z`,
+    lunch_completed: true,
+    lunch_completed_at: `2026-09-09T13:00:00.000Z`,
+    active_student_ids: ['11111111-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000004'],
+    is_temporary_swap: false,
+    notes: 'Completed by Swabah and Muhammed',
+    created_at: new Date().toISOString(),
+  });
+
   return duties;
 }
 
@@ -215,82 +273,146 @@ export function generateInitialCookingDuties(): CookingDuty[] {
 // Next Up: Dilshad (#5 in custom order)
 export function generateInitialImamLogs(regularRoundId: string, collegeRoundId = '22222222-0000-0000-0000-000000000002'): ImamLog[] {
   const logs: ImamLog[] = [];
+  const d8 = getRelativeDateString(-8);
+  const d6 = getRelativeDateString(-6);
+  const d5 = getRelativeDateString(-5);
   const d4 = getRelativeDateString(-4);
   const d3 = getRelativeDateString(-3);
   const d2 = getRelativeDateString(-2);
   const d1 = getRelativeDateString(-1);
 
-  // 1. Fuad — imam_order #1 — completed 4 days ago
+  // 0. Razeel — completed on the 6th of Sept (8 days ago)
+  logs.push({
+    id: 'log-asr-razeel-r1',
+    round_id: regularRoundId,
+    date: d8,
+    prayer_name: 'Asr',
+    student_id: '11111111-0000-0000-0000-000000000006', // Razeel
+    status: 'completed',
+    notes: 'Round 1 turn completed',
+    created_at: `${d8}T16:15:00Z`,
+  });
+
+  // 1. Fuad — imam_order #1 — completed 6 days ago
   logs.push({
     id: 'log-asr-fuad-r1',
     round_id: regularRoundId,
-    date: d4,
+    date: d6,
     prayer_name: 'Asr',
     student_id: '11111111-0000-0000-0000-000000000002', // Fuad
+    status: 'completed',
+    notes: 'Round 1 turn completed',
+    created_at: `${d6}T16:15:00Z`,
+  });
+
+  // 2. Swabah — imam_order #2 — completed 5 days ago
+  logs.push({
+    id: 'log-asr-swabah-r1',
+    round_id: regularRoundId,
+    date: d5,
+    prayer_name: 'Asr',
+    student_id: '11111111-0000-0000-0000-000000000003', // Swabah
+    status: 'completed',
+    notes: 'Round 1 turn completed',
+    created_at: `${d5}T16:15:00Z`,
+  });
+
+  // 3. Muhammed — imam_order #3 — completed 4 days ago
+  logs.push({
+    id: 'log-asr-muhammed-r1',
+    round_id: regularRoundId,
+    date: d4,
+    prayer_name: 'Asr',
+    student_id: '11111111-0000-0000-0000-000000000004', // Muhammed
     status: 'completed',
     notes: 'Round 1 turn completed',
     created_at: `${d4}T16:15:00Z`,
   });
 
-  // 2. Swabah — imam_order #2 — completed 3 days ago
+  // 4. Anfaz — imam_order #4 — completed 3 days ago
   logs.push({
-    id: 'log-asr-swabah-r1',
+    id: 'log-asr-anfaz-r1',
     round_id: regularRoundId,
     date: d3,
     prayer_name: 'Asr',
-    student_id: '11111111-0000-0000-0000-000000000003', // Swabah
+    student_id: '11111111-0000-0000-0000-000000000001', // Anfaz
     status: 'completed',
     notes: 'Round 1 turn completed',
     created_at: `${d3}T16:15:00Z`,
   });
 
-  // 3. Muhammed — imam_order #3 — completed 2 days ago
+  // 5. Hasir — college pool — completed 2 days ago
   logs.push({
-    id: 'log-asr-muhammed-r1',
-    round_id: regularRoundId,
-    date: d2,
-    prayer_name: 'Asr',
-    student_id: '11111111-0000-0000-0000-000000000004', // Muhammed
-    status: 'completed',
-    notes: 'Round 1 turn completed',
-    created_at: `${d2}T16:15:00Z`,
-  });
-
-  // 4. Anfaz — imam_order #4 — completed 1 day ago
-  logs.push({
-    id: 'log-asr-anfaz-r1',
-    round_id: regularRoundId,
-    date: d1,
-    prayer_name: 'Asr',
-    student_id: '11111111-0000-0000-0000-000000000001', // Anfaz
-    status: 'completed',
-    notes: 'Round 1 turn completed',
-    created_at: `${d1}T16:15:00Z`,
-  });
-
-  // Yesterday (2026-09-12): Hasir completed
-  logs.push({
-    id: 'log-asr-hasir-2026-09-12',
+    id: 'log-asr-hasir-r1',
     round_id: collegeRoundId,
-    date: '2026-09-12',
+    date: d2,
     prayer_name: 'Asr',
     student_id: '11111111-0000-0000-0000-000000000011', // Hasir
     status: 'completed',
     notes: 'Completed by Hasir',
-    created_at: `2026-09-12T16:15:00Z`,
+    created_at: `${d2}T16:15:00Z`,
   });
 
-  // 2026-09-11: Dilshad replaced by Razeel
+  // 6. Murshid — college pool — completed 1 day ago
   logs.push({
-    id: 'log-asr-dilshad-2026-09-11',
-    round_id: regularRoundId,
-    date: '2026-09-11',
+    id: 'log-asr-murshid-r1',
+    round_id: collegeRoundId,
+    date: d1,
     prayer_name: 'Asr',
-    student_id: '11111111-0000-0000-0000-000000000005', // Dilshad
-    status: 'replaced',
-    replacement_student_id: '11111111-0000-0000-0000-000000000006', // Razeel
-    notes: 'dilshad go to his home',
-    created_at: `2026-09-11T16:15:00Z`,
+    student_id: '11111111-0000-0000-0000-000000000015', // Murshid
+    status: 'completed',
+    notes: 'Completed by Murshid',
+    created_at: `${d1}T16:15:00Z`,
+  });
+
+  // --- HADDAD DUTY LOGS (First round completed for requested students) ---
+  const haddadRoundId = '22222222-0000-0000-0000-000000000003';
+  const haddadCompletedIds = [
+    '11111111-0000-0000-0000-000000000011', // Hasir
+    '11111111-0000-0000-0000-000000000003', // Swabah
+    '11111111-0000-0000-0000-000000000004', // Muhammed
+    '11111111-0000-0000-0000-000000000005', // Dilshad
+    '11111111-0000-0000-0000-000000000001', // Anfaz
+    '11111111-0000-0000-0000-000000000006', // Razeel
+    '11111111-0000-0000-0000-000000000012', // Nijad
+  ];
+
+  haddadCompletedIds.forEach((studentId, idx) => {
+    logs.push({
+      id: `log-haddad-seed-${idx}`,
+      round_id: haddadRoundId,
+      date: getRelativeDateString(-haddadCompletedIds.length + idx - 1),
+      prayer_name: 'Haddad',
+      student_id: studentId,
+      status: 'completed',
+      notes: 'Round 1 turn completed',
+      created_at: `${getRelativeDateString(-haddadCompletedIds.length + idx - 1)}T19:00:00Z`,
+    });
+  });
+
+  // --- ISHA AZAAN DUTY LOGS (First round completed for requested students) ---
+  const ishaAzaanRoundId = '22222222-0000-0000-0000-000000000004';
+  const ishaAzaanCompletedIds = [
+    '11111111-0000-0000-0000-000000000002', // Fuad
+    '11111111-0000-0000-0000-000000000003', // Swabah
+    '11111111-0000-0000-0000-000000000004', // Muhammed
+    '11111111-0000-0000-0000-000000000001', // Anfaz
+    '11111111-0000-0000-0000-000000000005', // Dilshad
+    '11111111-0000-0000-0000-000000000011', // Hasir
+    '11111111-0000-0000-0000-000000000008', // Nafil
+  ];
+
+  ishaAzaanCompletedIds.forEach((studentId, idx) => {
+    logs.push({
+      id: `log-ishaazaan-seed-${idx}`,
+      round_id: ishaAzaanRoundId,
+      date: getRelativeDateString(-ishaAzaanCompletedIds.length + idx),
+      prayer_name: 'Isha_Azaan',
+      student_id: studentId,
+      status: 'completed',
+      notes: 'Round 1 turn completed',
+      created_at: `${getRelativeDateString(-ishaAzaanCompletedIds.length + idx)}T20:00:00Z`,
+    });
   });
 
   return logs;

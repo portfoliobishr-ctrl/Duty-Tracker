@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { PrayerLoggerModal } from './PrayerLoggerModal';
 import { SwapMemberModal } from './SwapMemberModal';
+import { PrayerDutyCard } from './PrayerDutyCard';
 import confetti from 'canvas-confetti';
 
 export const TodayOverview: React.FC = () => {
@@ -44,6 +45,8 @@ export const TodayOverview: React.FC = () => {
 
   // Modal for Substitute / No Imam
   const [prayerModalOpen, setPrayerModalOpen] = useState(false);
+  const [activeModalDuty, setActiveModalDuty] = useState<'Asr' | 'Haddad' | 'Isha_Azaan'>('Asr');
+  const [activePrayerTab, setActivePrayerTab] = useState<'Asr' | 'Haddad' | 'Isha_Azaan'>('Asr');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
 
   const { showToast } = useToast();
@@ -53,7 +56,7 @@ export const TodayOverview: React.FC = () => {
     setTodayDuty(duty);
     setGroups(dutyStore.getGroupsWithMembers());
 
-    const asrData = dutyStore.getAssignedAsrImam(todayDate);
+    const asrData = dutyStore.getAssignedDutyStudent(todayDate, 'Asr');
     setAssignedAsr(asrData);
 
     const asrLog = dutyStore.getImamLogs().find((l) => l.date === todayDate && l.prayer_name === 'Asr') || null;
@@ -121,7 +124,8 @@ export const TodayOverview: React.FC = () => {
     if (!activeStudentId) return;
 
     if (dailyImamState?.acting_student_id) {
-      dutyStore.logAsrDuty({
+      dutyStore.logDuty({
+        prayerName: 'Asr',
         date: todayDate,
         studentId: dailyImamState.assigned_student_id,
         status: 'absent_replaced',
@@ -129,7 +133,8 @@ export const TodayOverview: React.FC = () => {
         notes: 'Confirmed from Today action screen (Substitute)',
       });
     } else if (assignedAsr?.student) {
-      dutyStore.logAsrDuty({
+      dutyStore.logDuty({
+        prayerName: 'Asr',
         date: todayDate,
         studentId: assignedAsr.student.id,
         status: 'completed',
@@ -185,7 +190,7 @@ export const TodayOverview: React.FC = () => {
   const isTomorrowHoliday = isHolidayOrSunday(tomorrowDate, settings.default_holidays);
   const tomorrowPool: 'regular' | 'college' = isTomorrowHoliday ? 'college' : 'regular';
   
-  const tomorrowAsrQueue = dutyStore.getUpcomingAsrQueue(tomorrowPool);
+  const tomorrowAsrQueue = dutyStore.getUpcomingQueue('Asr', tomorrowPool);
   const nextAsrQueueItem = tomorrowAsrQueue.queue.find((q) => q.isNext);
   const nextAsrCandidate = nextAsrQueueItem ? {
     student: nextAsrQueueItem.student,
@@ -488,184 +493,47 @@ export const TodayOverview: React.FC = () => {
         </section>
       )}
 
-      {/* 3. Today's Asr Imam Card */}
-      <section className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden transition-all">
-        {/* Card Header */}
-        <div className="p-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shadow-xs">
-              <Compass className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Asr Imam Duty
-              </span>
-              <h2 className="text-base font-bold text-slate-900 leading-tight">
-                Single Congregational Duty
-              </h2>
-            </div>
-          </div>
+      {/* 3. Prayer Duties Segmented Control */}
+      <div className="bg-slate-100/80 p-1 rounded-xl flex items-center mb-4 border border-slate-200/50">
+        <button
+          onClick={() => setActivePrayerTab('Asr')}
+          className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+            activePrayerTab === 'Asr' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Asr
+        </button>
+        <button
+          onClick={() => setActivePrayerTab('Haddad')}
+          className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+            activePrayerTab === 'Haddad' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Haddad
+        </button>
+        <button
+          onClick={() => setActivePrayerTab('Isha_Azaan')}
+          className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+            activePrayerTab === 'Isha_Azaan' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Azaan
+        </button>
+      </div>
 
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-            assignedAsr?.isHoliday 
-              ? 'bg-amber-100 text-amber-800' 
-              : 'bg-slate-100 text-slate-700'
-          }`}>
-            {assignedAsr?.isHoliday ? 'Holiday / Weekend' : 'Regular Day'}
-          </span>
-        </div>
+      <div className="space-y-4">
+        <PrayerDutyCard 
+          dutyType={activePrayerTab} 
+          onOpenModal={() => { setActiveModalDuty(activePrayerTab); setPrayerModalOpen(true); }} 
+        />
+      </div>
 
-        {/* Assigned Imam Profile: Completed vs Pending */}
-        {isAsrDone ? (
-          <div className="p-4 bg-emerald-50/30 border-b border-emerald-100/60 space-y-3">
-            {/* Today's Completed Banner */}
-            <div className="p-3 rounded-2xl bg-white border border-emerald-200/80 shadow-2xs flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <Check className="w-4 h-4 stroke-[3]" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
-                    Today&apos;s Duty Completed
-                  </span>
-                  <span className="text-xs font-bold text-slate-900">
-                    Led by {todayImamStudent?.name || assignedAsr?.student?.name || 'Assigned Student'}
-                  </span>
-                </div>
-              </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Led</span>
-              </span>
-            </div>
-
-            {/* Next Asr Imam in Line (Tomorrow / After Today) */}
-            {nextAsrCandidate && (
-              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white font-bold text-base flex items-center justify-center shadow-xs">
-                      {nextAsrCandidate.student.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                          Next Asr Imam (Tomorrow)
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                          Up Next
-                        </span>
-                      </div>
-                      <span className="text-lg font-extrabold text-slate-900 tracking-tight block mt-0.5">
-                        {nextAsrCandidate.student.name}
-                      </span>
-                      <div className="flex items-center space-x-1.5 text-xs text-slate-500">
-                        <span>Round {nextAsrCandidate.round.round_number}</span>
-                        <span>•</span>
-                        <span>Queue: #{nextAsrCandidate.queuePosition} of {nextAsrCandidate.totalInPool}</span>
-                        <span>•</span>
-                        <span>{nextAsrCandidate.pool === 'college' ? 'College' : 'Regular'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="p-4 bg-emerald-50/40 border-b border-emerald-100/60">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white font-bold text-lg flex items-center justify-center shadow-sm shadow-emerald-600/20">
-                  {activeStudent?.name ? activeStudent.name.charAt(0) : 'D'}
-                </div>
-                <div>
-                  <span className="text-xs font-semibold text-emerald-800 flex items-center space-x-1">
-                    <span>Scheduled Asr Imam</span>
-                    {pendingSubstituteStudent && (
-                      <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
-                        [Substituted]
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-xl font-extrabold text-slate-900 tracking-tight">
-                    {activeStudent?.name || 'Dilshad'}
-                  </span>
-                  <div className="flex items-center space-x-1.5 mt-0.5 text-xs text-slate-500">
-                    <span>Round 1</span>
-                    <span>•</span>
-                    <span>Queue: #{assignedAsr?.queuePosition || 2} of {assignedAsr?.totalInPool || 10}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  Pending
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons: Mark Asr Led (>= 48px) + Helper: Substitute / No Imam */}
-        <div className="p-4 space-y-2.5">
-          {/* Main 1-Tap Button */}
-          <button
-            type="button"
-            onClick={handleMarkAsrLed}
-            disabled={isAsrDone}
-            className={`min-h-[48px] w-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition-all active:scale-[0.98] ${
-              isAsrDone
-                ? 'bg-slate-100 text-slate-500 cursor-default border border-slate-200/60'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/25'
-            }`}
-          >
-            {isAsrDone ? (
-              <>
-                <Check className="w-4 h-4 stroke-[3] text-emerald-600" />
-                <span>Asr Completed for Today</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                <span>Mark Asr Led by {activeStudent?.name || 'Dilshad'}</span>
-              </>
-            )}
-          </button>
-
-          {/* Small Helper Button for Substitute / No Imam */}
-          <div className="flex justify-end space-x-3">
-            {pendingSubstituteStudent && !isAsrDone && (
-              <button
-                type="button"
-                onClick={() => {
-                  dutyStore.clearDailyImamState();
-                  refreshData();
-                }}
-                className="text-xs font-semibold text-slate-500 hover:text-amber-700 hover:underline flex items-center py-1 px-2"
-              >
-                Cancel / Revert
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setPrayerModalOpen(true)}
-              className="text-xs font-semibold text-slate-500 hover:text-emerald-700 hover:underline flex items-center space-x-1 py-1 px-2"
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>Substitute / No Imam</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Prayer Logger Modal for Substitutions */}
+      {/* Action Modals */}
       <PrayerLoggerModal
         isOpen={prayerModalOpen}
         onClose={() => setPrayerModalOpen(false)}
         defaultDate={todayDate}
-        defaultStudentId={assignedAsr?.student?.id}
+        dutyType={activeModalDuty}
         onSuccess={() => {
           refreshData();
           setPrayerModalOpen(false);

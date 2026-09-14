@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Student, 
   ImamLogStatus,
-  PoolType 
+  PoolType,
+  PrayerSlotName
 } from '@/types/database';
 import { dutyStore } from '@/lib/dutyStore';
 import { useToast } from '@/context/ToastContext';
@@ -24,6 +25,7 @@ interface PrayerLoggerModalProps {
   defaultStudentId?: string;
   defaultDate?: string;
   onSuccess?: () => void;
+  dutyType?: PrayerSlotName;
   onSetSubstitute?: (studentId: string, replacementStudentId: string) => void;
 }
 
@@ -32,6 +34,7 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
   onClose,
   defaultStudentId,
   defaultDate,
+  dutyType = 'Asr',
   onSuccess,
   onSetSubstitute,
 }) => {
@@ -54,7 +57,7 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
       setDate(effectiveDate);
       setStatus('completed');
 
-      const assignedInfo = dutyStore.getAssignedAsrImam(effectiveDate);
+      const assignedInfo = dutyStore.getAssignedDutyStudent(effectiveDate, dutyType);
       setPoolInfo({ pool: assignedInfo.pool, isHoliday: assignedInfo.isHoliday });
 
       if (defaultStudentId) {
@@ -70,7 +73,7 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
   // When date changes, recalculate pool & candidate
   const handleDateChange = (newDate: string) => {
     setDate(newDate);
-    const assignedInfo = dutyStore.getAssignedAsrImam(newDate);
+    const assignedInfo = dutyStore.getAssignedDutyStudent(newDate, dutyType);
     setPoolInfo({ pool: assignedInfo.pool, isHoliday: assignedInfo.isHoliday });
     if (assignedInfo.student && !defaultStudentId) {
       setStudentId(assignedInfo.student.id);
@@ -91,7 +94,8 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
         return;
       }
 
-      const result = dutyStore.logAsrDuty({
+      const result = dutyStore.logDuty({
+        prayerName: dutyType,
         date,
         status,
         studentId: status === 'external_imam' || status === 'none' ? null : (studentId || null),

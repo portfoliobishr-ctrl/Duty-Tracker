@@ -1,20 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Group, Student } from '@/types/database';
+import { Group, Student, StudentReport } from '@/types/database';
 import { dutyStore } from '@/lib/dutyStore';
 import { Users, Utensils, CheckCircle2, Clock, Edit3, RefreshCw } from 'lucide-react';
 import { EditGroupModal } from './EditGroupModal';
 
 export const GroupRosterView: React.FC = () => {
   const [groups, setGroups] = useState<(Group & { members: Student[] })[]>([]);
-  const [stats, setStats] = useState(dutyStore.getImamStats().stats);
+  const [reports, setReports] = useState<StudentReport[]>([]);
   const [selectedGroupForEdit, setSelectedGroupForEdit] = useState<(Group & { members: Student[] }) | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const loadData = () => {
     setGroups(dutyStore.getGroupsWithMembers());
-    setStats(dutyStore.getImamStats().stats);
+    setReports(dutyStore.getStudentReports());
   };
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export const GroupRosterView: React.FC = () => {
                 {/* 2 Members in this group */}
                 <div className="space-y-2">
                   {group.members.map((member) => {
-                    const memberStats = stats.find((s) => s.student.id === member.id);
+                    const memberReport = reports.find((r) => r.student.id === member.id);
                     return (
                       <div
                         key={member.id}
@@ -137,13 +137,13 @@ export const GroupRosterView: React.FC = () => {
                               {member.name}
                             </span>
                             <span className="text-[10px] text-slate-400">
-                              Led: <strong className="text-slate-700 font-bold">{memberStats?.allTimeLedCount || 0}</strong> prayers
+                              Led: <strong className="text-slate-700 font-bold">{memberReport?.totalPrayersLed || 0}</strong> prayers
                             </span>
                           </div>
                         </div>
 
                         <div>
-                          {memberStats?.hasLedCurrentRound ? (
+                          {memberReport?.hasLedCurrentRound ? (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               <span>Round Done</span>
