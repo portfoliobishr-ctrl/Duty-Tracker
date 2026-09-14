@@ -465,8 +465,8 @@ export const TodayOverview: React.FC = () => {
               </button>
             </div>
 
-            {/* When Today's Cooking is Done: Show Next Cooking Team */}
-            {isBreakfastDone && isLunchDone && nextCookingItem && (
+            {/* Next Cooking Team (Always Visible) */}
+            {nextCookingItem && (
               <div className="p-3.5 rounded-xl bg-gradient-to-r from-orange-50/90 to-amber-50/70 border border-orange-200/80 flex items-center justify-between shadow-2xs animate-in fade-in duration-200">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-xs">
