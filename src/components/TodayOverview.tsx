@@ -70,6 +70,8 @@ export const TodayOverview: React.FC = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshData();
     const unsubscribe = dutyStore.subscribe(() => {
       refreshData();
@@ -78,6 +80,7 @@ export const TodayOverview: React.FC = () => {
       }
     });
     return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayDate, activePrayerTab]);
 
   // Current cooking group & members

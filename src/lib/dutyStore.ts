@@ -844,7 +844,7 @@ class DutyStore {
   // Get active round for a specific pool
   public getActiveRound(pool: PoolType, dutyType: PrayerSlotName = 'Asr'): ImamRound {
     const rounds = this.getImamRounds();
-    let active = rounds.find((r) => r.pool === pool && r.duty_type === dutyType && r.status === 'active');
+    const active = rounds.find((r) => r.pool === pool && r.duty_type === dutyType && r.status === 'active');
     if (active) return active;
 
     const poolRounds = rounds.filter((r) => r.pool === pool && r.duty_type === dutyType);
@@ -1106,7 +1106,7 @@ class DutyStore {
   // Get statistics for both pools
   public getDualPoolStats(dutyType: PrayerSlotName = 'Asr'): {
     poolA: PoolStats;
-    poolB: PoolStats;
+    poolB: PoolStats | null;
   } {
     const logs = this.getImamLogs().filter((l) => l.prayer_name === dutyType);
 
@@ -1168,7 +1168,7 @@ class DutyStore {
     };
 
     const poolA = computePool('regular', dutyType === 'Asr' ? 'Pool A: Regular Students (Working Days)' : 'All Students (Unified Rotation)', dutyType === 'Asr' ? this.getPoolAStudents() : this.getUnifiedStudents());
-    const poolB = dutyType === 'Asr' ? computePool('college', 'Pool B: College Students (Holidays/Sundays)', this.getPoolBStudents()) : null as any;
+    const poolB: PoolStats | null = dutyType === 'Asr' ? computePool('college', 'Pool B: College Students (Holidays/Sundays)', this.getPoolBStudents()) : null;
 
     return { poolA, poolB };
   }
@@ -1268,9 +1268,6 @@ class DutyStore {
       const totalAsrLed = ledLogs.filter(l => l.prayer_name === 'Asr').length;
       const totalHaddadLed = ledLogs.filter(l => l.prayer_name === 'Haddad').length;
       const totalIshaAzaanLed = ledLogs.filter(l => l.prayer_name === 'Isha_Azaan').length;
-      
-      const isNextAsrCandidate = assignedAsr.student?.id === s.id;
-
       return {
         student: s,
         group,

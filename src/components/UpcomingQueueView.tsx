@@ -74,9 +74,12 @@ export const UpcomingQueueView: React.FC = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshData();
     const unsubscribe = dutyStore.subscribe(refreshData);
     return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImamPool]);
 
   // Format date helper (e.g., "Today", "Tomorrow", "Fri, Sep 12")

@@ -22,7 +22,7 @@ import { PrayerLoggerModal } from './PrayerLoggerModal';
 import confetti from 'canvas-confetti';
 
 export const ImamDutyView: React.FC = () => {
-  const [dualStats, setDualStats] = useState<{ poolA: PoolStats; poolB: PoolStats } | null>(null);
+  const [dualStats, setDualStats] = useState<{ poolA: PoolStats; poolB: PoolStats | null } | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'regular' | 'college'>('all');
   const [activeDuty, setActiveDuty] = useState<PrayerSlotName>('Asr');
 
