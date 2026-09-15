@@ -4,7 +4,8 @@ import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { 
   Database, 
   RotateCcw, 
-  Compass
+  Compass,
+  Calendar
 } from 'lucide-react';
 import { dutyStore } from '@/lib/dutyStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -71,14 +72,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSupabaseModal }) => {
           </div>
 
           {/* Right Date Badge */}
-          <div className="relative flex items-center space-x-1.5 text-[11px] sm:text-xs text-slate-500 font-medium px-2.5 sm:px-3 py-1 rounded-full bg-slate-100/80 border border-slate-200/60 overflow-hidden cursor-pointer hover:bg-slate-200/80 transition-colors">
-            <span suppressHydrationWarning className="text-slate-800 font-semibold pointer-events-none">{mounted ? formattedDate : ''}</span>
-            <input 
-              type="date" 
-              value={dutyStore.getTodayStr()}
-              onChange={handleDateChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
+          <div className="flex items-center space-x-1.5 text-[11px] sm:text-xs text-slate-500 font-medium pl-3 pr-1.5 py-1 rounded-full bg-slate-100/80 border border-slate-200/60">
+            <span suppressHydrationWarning className="text-slate-800 font-semibold whitespace-nowrap">{mounted ? formattedDate : ''}</span>
+            <div className="relative flex items-center justify-center w-6 h-6 rounded-full hover:bg-slate-200 transition-colors">
+              <input 
+                type="date" 
+                value={dutyStore.getTodayStr()}
+                onChange={handleDateChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                title="Change Date"
+              />
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
+            </div>
           </div>
         </div>
       </div>
