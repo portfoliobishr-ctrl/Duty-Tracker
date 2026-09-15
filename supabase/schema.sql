@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.students (
     name VARCHAR(100) NOT NULL,
     group_id INTEGER REFERENCES public.groups(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT   
 );
 
 -- 3. SYSTEM SETTINGS TABLE (Default holidays: 0 = Sun)
