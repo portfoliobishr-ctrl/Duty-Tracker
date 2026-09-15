@@ -98,23 +98,27 @@ export const TodayOverview: React.FC = () => {
   };
 
   // 1-Tap Meal toggle (Breakfast or Lunch)
-  const handleToggleMeal = (meal: 'breakfast' | 'lunch') => {
-    const updated = dutyStore.toggleMealCompletion(todayDate, meal);
-    setTodayDuty({ ...updated });
+  const handleToggleMeal = async (meal: 'breakfast' | 'lunch') => {
+    try {
+      const updated = await dutyStore.toggleMealCompletion(todayDate, meal);
+      setTodayDuty({ ...updated });
 
-    const isNowDone = meal === 'breakfast' ? updated.breakfast_completed : updated.lunch_completed;
-    if (isNowDone) {
-      try {
-        confetti({
-          particleCount: 40,
-          spread: 60,
-          origin: { y: 0.6 },
-          colors: ['#059669', '#10b981', '#34d399'],
-        });
-      } catch {}
-      showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} marked done!`, 'success');
-    } else {
-      showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} marked pending`, 'info');
+      const isNowDone = meal === 'breakfast' ? updated.breakfast_completed : updated.lunch_completed;
+      if (isNowDone) {
+        try {
+          confetti({
+            particleCount: 40,
+            spread: 60,
+            origin: { y: 0.6 },
+            colors: ['#059669', '#10b981', '#34d399'],
+          });
+        } catch {}
+        showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} marked done!`, 'success');
+      } else {
+        showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} marked pending`, 'info');
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update database', 'error');
     }
   };
 

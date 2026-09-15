@@ -38,23 +38,27 @@ export const CookingDutyView: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleToggleMeal = (dateStr: string, meal: 'breakfast' | 'lunch') => {
-    const updated = dutyStore.toggleMealCompletion(dateStr, meal);
-    loadData();
+  const handleToggleMeal = async (dateStr: string, meal: 'breakfast' | 'lunch') => {
+    try {
+      const updated = await dutyStore.toggleMealCompletion(dateStr, meal);
+      loadData();
 
-    const isDone = meal === 'breakfast' ? updated.breakfast_completed : updated.lunch_completed;
-    if (isDone) {
-      try {
-        confetti({
-          particleCount: 30,
-          spread: 40,
-          origin: { y: 0.7 },
-          colors: ['#059669', '#10b981'],
-        });
-      } catch {}
-      showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} marked completed`, 'success');
-    } else {
-      showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} set to pending`, 'info');
+      const isDone = meal === 'breakfast' ? updated.breakfast_completed : updated.lunch_completed;
+      if (isDone) {
+        try {
+          confetti({
+            particleCount: 30,
+            spread: 40,
+            origin: { y: 0.7 },
+            colors: ['#059669', '#10b981'],
+          });
+        } catch {}
+        showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} marked completed`, 'success');
+      } else {
+        showToast(`${meal === 'breakfast' ? 'Breakfast' : 'Lunch'} set to pending`, 'info');
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update database', 'error');
     }
   };
 

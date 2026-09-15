@@ -31,15 +31,6 @@ import {
 import { supabase, isSupabaseConfigured } from './supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-const STORAGE_KEYS = {
-  GROUPS: 'duty_tracker_groups_v8',
-  STUDENTS: 'duty_tracker_students_v10',
-  COOKING: 'duty_tracker_cooking_duties_v10',
-  ROUNDS: 'duty_tracker_imam_rounds_v9',
-  IMAM_LOGS: 'duty_tracker_imam_logs_v9',
-  SETTINGS: 'duty_tracker_settings_v10',
-  DAILY_IMAM_STATE: 'duty_tracker_daily_imam_state_v1',
-};
 
 class DutyStore {
   private listeners: Set<() => void> = new Set();
@@ -433,6 +424,7 @@ class DutyStore {
     // Find past assigned duties up to the given date to determine the next group in the sequence
     const pastDuties = duties.filter(
       (d) => !d.is_no_duty && d.group_id !== null && 
+             d.breakfast_completed && d.lunch_completed &&
              (!upToDateStr || d.duty_date < upToDateStr)
     );
 
@@ -732,7 +724,7 @@ class DutyStore {
     return duty;
   }
 
-  public toggleMealCompletion(dateStr: string, meal: 'breakfast' | 'lunch'): CookingDuty {
+  public async toggleMealCompletion(dateStr: string, meal: 'breakfast' | 'lunch'): Promise<CookingDuty> {
     let duties = this.getCookingDuties();
     let duty = duties.find((d) => d.duty_date === dateStr);
 
@@ -741,6 +733,11 @@ class DutyStore {
       duties = this.getCookingDuties();
       duty = duties.find((d) => d.duty_date === dateStr)!;
     }
+
+    const originalBreakfast = duty.breakfast_completed;
+    const originalBreakfastAt = duty.breakfast_completed_at;
+    const originalLunch = duty.lunch_completed;
+    const originalLunchAt = duty.lunch_completed_at;
 
     const now = new Date().toISOString();
 
@@ -752,11 +749,8 @@ class DutyStore {
       duty.lunch_completed_at = duty.lunch_completed ? now : null;
     }
 
-    
-    this.notify();
-
     if (isSupabaseConfigured() && supabase) {
-      supabase.from('cooking_duties').upsert({
+      const { error } = await supabase.from('cooking_duties').upsert({
         id: duty.id,
         duty_date: duty.duty_date,
         group_id: duty.group_id,
@@ -768,9 +762,22 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
+      }, { onConflict: 'duty_date' });
+
+      if (error) {
+        // Rollback
+        duty.breakfast_completed = originalBreakfast;
+        duty.breakfast_completed_at = originalBreakfastAt;
+        duty.lunch_completed = originalLunch;
+        duty.lunch_completed_at = originalLunchAt;
+        this.notify();
+        throw new Error(error.message);
+      }
+    } else {
+      throw new Error('Supabase is not connected. Cannot save changes.');
     }
 
+    this.notify();
     return duty;
   }
 
@@ -875,18 +882,18 @@ class DutyStore {
   }
 
   // Log Duty (Asr, Haddad, Isha Azaan)
-  public logDuty(params: {
+  public async logDuty(params: {
     prayerName?: PrayerSlotName;
     date: string;
     studentId?: string | null;
     status: ImamLogStatus;
     replacementStudentId?: string | null;
     notes?: string;
-  }): {
+  }): Promise<{
     log: ImamLog;
     roundAdvanced: boolean;
     newRound?: ImamRound;
-  } {
+  }> {
     const students = this.getStudents();
     const allRounds = this.getImamRounds();
     const logs = this.getImamLogs();
@@ -920,14 +927,28 @@ class DutyStore {
       created_at: new Date().toISOString(),
     };
 
+    if (isSupabaseConfigured() && supabase) {
+      const { error } = await supabase.from('imam_logs').insert({
+        id: newLog.id,
+        round_id: newLog.round_id,
+        date: newLog.date,
+        prayer_name: dutyType,
+        student_id: newLog.student_id,
+        status: newLog.status,
+        replacement_student_id: newLog.replacement_student_id,
+        notes: newLog.notes,
+      });
+      if (error) throw new Error(error.message);
+    } else {
+      throw new Error('Supabase is not connected. Cannot log duty.');
+    }
+
     logs.unshift(newLog);
 
     // Clear any pending daily state for this date
     if (this.getDailyImamState(params.date)) {
       this.clearDailyImamState();
     }
-
-    
 
     // Check round progression for this pool
     let roundAdvanced = false;
@@ -962,39 +983,24 @@ class DutyStore {
         created_at: now,
       };
 
-      if (newRound) {
-        allRounds.push(newRound);
-      }
-
-    }
-
-    this.notify();
-
-    if (isSupabaseConfigured() && supabase) {
-      supabase.from('imam_logs').insert({
-        id: newLog.id,
-        round_id: newLog.round_id,
-        date: newLog.date,
-        prayer_name: dutyType,
-        student_id: newLog.student_id,
-        status: newLog.status,
-        replacement_student_id: newLog.replacement_student_id,
-        notes: newLog.notes,
-      }).then(r => r.error && console.error(r.error));
-
-      if (roundAdvanced && newRound) {
-        supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id).then(r => r.error && console.error(r.error));
-        supabase.from('imam_rounds').insert({
+      if (isSupabaseConfigured() && supabase && newRound) {
+        await supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id);
+        await supabase.from('imam_rounds').insert({
           id: newRound.id,
           round_number: newRound.round_number,
           pool: newRound.pool,
           duty_type: newRound.duty_type,
           status: 'active',
           started_at: newRound.started_at,
-        }).then(r => r.error && console.error(r.error));
+        });
+      }
+
+      if (newRound) {
+        allRounds.push(newRound);
       }
     }
 
+    this.notify();
     return { log: newLog, roundAdvanced, newRound };
   }
 
@@ -1031,7 +1037,7 @@ class DutyStore {
   }
 
   // Toggle student turn manually in their active pool round
-  public toggleStudentRoundTurn(studentId: string, turnCompleted: boolean, dutyType: PrayerSlotName = 'Asr'): void {
+  public async toggleStudentRoundTurn(studentId: string, turnCompleted: boolean, dutyType: PrayerSlotName = 'Asr'): Promise<void> {
     const students = this.getStudents();
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
@@ -1041,7 +1047,7 @@ class DutyStore {
     const logs = this.getImamLogs();
 
     if (turnCompleted) {
-      this.logDuty({
+      await this.logDuty({
         prayerName: dutyType,
         date: getRelativeDateString(0),
         status: 'completed',
@@ -1049,10 +1055,22 @@ class DutyStore {
         notes: 'Manually verified turn',
       });
     } else {
-      const filtered = logs.filter(
+      if (!isSupabaseConfigured() || !supabase) {
+        throw new Error('Supabase is not connected. Cannot delete log.');
+      }
+      
+      const logsToDelete = logs.filter(
+        (l) => l.round_id === activeRound.id && (l.student_id === studentId || l.replacement_student_id === studentId)
+      );
+
+      for (const l of logsToDelete) {
+        const { error } = await supabase.from('imam_logs').delete().eq('id', l.id);
+        if (error) throw new Error(error.message);
+      }
+
+      this.state.imam_logs = logs.filter(
         (l) => !(l.round_id === activeRound.id && (l.student_id === studentId || l.replacement_student_id === studentId))
       );
-      
       this.notify();
     }
   }

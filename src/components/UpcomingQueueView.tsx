@@ -61,17 +61,9 @@ export const UpcomingQueueView: React.FC = () => {
   const [selectedDutyForSwap, setSelectedDutyForSwap] = useState<{ date: string, members: Student[] } | null>(null);
   const [haddadEnabled, setHaddadEnabled] = useState(true);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('haddad_enabled');
-    if (saved !== null) {
-      setHaddadEnabled(saved === 'true');
-    }
-  }, []);
 
   const toggleHaddad = () => {
-    const newVal = !haddadEnabled;
-    setHaddadEnabled(newVal);
-    localStorage.setItem('haddad_enabled', String(newVal));
+    setHaddadEnabled(prev => !prev);
   };
 
   const refreshData = () => {

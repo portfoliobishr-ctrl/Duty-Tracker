@@ -43,20 +43,24 @@ export const ImamDutyView: React.FC = () => {
     return () => unsubscribe();
   }, [refreshData]);
 
-  const handleToggleStudentTurn = (student: Student, pool: PoolType, currentStatus: boolean, roundNumber: number) => {
-    dutyStore.toggleStudentRoundTurn(student.id, !currentStatus, activeDuty);
-    if (!currentStatus) {
-      try {
-        confetti({
-          particleCount: 35,
-          spread: 50,
-          origin: { y: 0.7 },
-          colors: ['#059669', '#10b981', '#34d399'],
-        });
-      } catch {}
-      showToast(`${student.name} marked completed for Round ${roundNumber} (${pool === 'college' ? 'College Pool' : 'Regular Pool'})`, 'success');
-    } else {
-      showToast(`${student.name} turn reset to pending for Round ${roundNumber}`, 'info');
+  const handleToggleStudentTurn = async (student: Student, pool: PoolType, currentStatus: boolean, roundNumber: number) => {
+    try {
+      await dutyStore.toggleStudentRoundTurn(student.id, !currentStatus, activeDuty);
+      if (!currentStatus) {
+        try {
+          confetti({
+            particleCount: 35,
+            spread: 50,
+            origin: { y: 0.7 },
+            colors: ['#059669', '#10b981', '#34d399'],
+          });
+        } catch {}
+        showToast(`${student.name} marked completed for Round ${roundNumber} (${pool === 'college' ? 'College Pool' : 'Regular Pool'})`, 'success');
+      } else {
+        showToast(`${student.name} turn reset to pending for Round ${roundNumber}`, 'info');
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update database', 'error');
     }
   };
 

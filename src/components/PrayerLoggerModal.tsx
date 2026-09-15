@@ -82,8 +82,9 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (status === 'none' && !onSetSubstitute) return;
     setIsSubmitting(true);
 
     try {
@@ -94,7 +95,7 @@ export const PrayerLoggerModal: React.FC<PrayerLoggerModalProps> = ({
         return;
       }
 
-      const result = dutyStore.logDuty({
+      const result = await dutyStore.logDuty({
         prayerName: dutyType,
         date,
         status,
