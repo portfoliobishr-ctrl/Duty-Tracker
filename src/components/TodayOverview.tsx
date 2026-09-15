@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { 
   CookingDuty, 
   Student, 
@@ -30,8 +30,12 @@ import { PrayerDutyCard } from './PrayerDutyCard';
 import confetti from 'canvas-confetti';
 
 export const TodayOverview: React.FC = () => {
-  const [todayDate] = useState<string>(() => getRelativeDateString(0));
-  const [todayDuty, setTodayDuty] = useState<CookingDuty | null>(() => dutyStore.ensureDutyForDate(getRelativeDateString(0)));
+  const todayDate = useSyncExternalStore(
+    (listener) => dutyStore.subscribe(listener),
+    () => dutyStore.getTodayStr(),
+    () => dutyStore.getTodayStr()
+  );
+  const [todayDuty, setTodayDuty] = useState<CookingDuty | null>(null);
   const [groups, setGroups] = useState<(Group & { members: Student[] })[]>(() => dutyStore.getGroupsWithMembers());
   const [todayAsrLog, setTodayAsrLog] = useState<ImamLog | null>(null);
   const [assignedAsr, setAssignedAsr] = useState<{

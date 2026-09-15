@@ -106,9 +106,9 @@ export const INITIAL_ROUNDS: ImamRound[] = [
   },
 ];
 
-// Helper to generate dates in YYYY-MM-DD format relative to today
-export function getRelativeDateString(offsetDays: number): string {
-  const d = new Date();
+// Helper to generate dates in YYYY-MM-DD format relative to today (or a base date)
+export function getRelativeDateString(offsetDays: number, baseDate?: Date): string {
+  const d = baseDate ? new Date(baseDate) : new Date();
   d.setDate(d.getDate() + offsetDays);
   return d.toISOString().split('T')[0];
 }

@@ -35,6 +35,20 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 class DutyStore {
   private listeners: Set<() => void> = new Set();
   public isSyncing: boolean = false;
+  public selectedDate: string | null = null;
+
+  public getToday(): Date {
+    return this.selectedDate ? new Date(this.selectedDate) : new Date();
+  }
+
+  public getTodayStr(): string {
+    return this.getToday().toISOString().split('T')[0];
+  }
+
+  public setSelectedDate(dateStr: string | null) {
+    this.selectedDate = dateStr;
+    this.notify();
+  }
 
   private state = {
     groups: INITIAL_GROUPS,
