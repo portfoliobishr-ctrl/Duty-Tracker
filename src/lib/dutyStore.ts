@@ -229,8 +229,22 @@ class DutyStore {
     return this.state.settings;
   }
 
-  public saveSystemSettings(settings: SystemSettings) {
-    this.state.settings = settings;
+  public async toggleHaddadEnabled() {
+    const current = this.state.settings.haddad_enabled;
+    this.state.settings.haddad_enabled = !current;
+    
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase!.from('system_settings').upsert({
+          id: 1,
+          default_holidays: this.state.settings.default_holidays,
+          haddad_enabled: !current
+        });
+      } catch (err) {
+        console.error('Failed to save haddad_enabled to supabase:', err);
+      }
+    }
+    
     this.notify();
   }
 

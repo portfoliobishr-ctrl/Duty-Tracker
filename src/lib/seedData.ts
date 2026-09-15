@@ -11,6 +11,7 @@ import {
 export const INITIAL_SYSTEM_SETTINGS: SystemSettings = {
   id: 1,
   default_holidays: [0, 6], // 0 = Sunday, 6 = Saturday (College Team cooking & Imam). Friday is dedicated No Food Duty.
+  haddad_enabled: true,
 };
 
 export const INITIAL_GROUPS: Group[] = [

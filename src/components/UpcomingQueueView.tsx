@@ -61,9 +61,8 @@ export const UpcomingQueueView: React.FC = () => {
   const [selectedDutyForSwap, setSelectedDutyForSwap] = useState<{ date: string, members: Student[] } | null>(null);
   const [haddadEnabled, setHaddadEnabled] = useState(true);
 
-
-  const toggleHaddad = () => {
-    setHaddadEnabled(prev => !prev);
+  const toggleHaddad = async () => {
+    await dutyStore.toggleHaddadEnabled();
   };
 
   const refreshData = () => {
@@ -71,6 +70,7 @@ export const UpcomingQueueView: React.FC = () => {
     setAsrQueue(dutyStore.getUpcomingQueue('Asr', selectedImamPool));
     setHaddadQueue(dutyStore.getUpcomingQueue('Haddad'));
     setIshaAzaanQueue(dutyStore.getUpcomingQueue('Isha_Azaan'));
+    setHaddadEnabled(dutyStore.getSystemSettings().haddad_enabled ?? true);
   };
 
   useEffect(() => {

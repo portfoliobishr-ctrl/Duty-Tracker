@@ -27,6 +27,7 @@ export interface Student {
 export interface SystemSettings {
   id: number;
   default_holidays: number[]; // 0 = Sunday, 5 = Friday
+  haddad_enabled: boolean;
 }
 
 export interface CookingDuty {

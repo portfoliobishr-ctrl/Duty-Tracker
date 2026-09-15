@@ -54,8 +54,9 @@ CREATE TABLE IF NOT EXISTS public.students (
 
 -- 3. SYSTEM SETTINGS TABLE (Default holidays: 0 = Sun)
 CREATE TABLE IF NOT EXISTS public.system_settings (
-    id INTEGER PRIMARY KEY,
-    default_holidays INTEGER[] DEFAULT ARRAY[0] NOT NULL,
+    id BIGINT PRIMARY KEY,
+    default_holidays SMALLINT[] DEFAULT '{0, 6}' NOT NULL,
+    haddad_enabled BOOLEAN DEFAULT true NOT NULL,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

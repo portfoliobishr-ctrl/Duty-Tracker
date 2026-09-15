@@ -71,9 +71,14 @@ export const TodayOverview: React.FC = () => {
 
   useEffect(() => {
     refreshData();
-    const unsubscribe = dutyStore.subscribe(refreshData);
+    const unsubscribe = dutyStore.subscribe(() => {
+      refreshData();
+      if (!dutyStore.getSystemSettings().haddad_enabled && activePrayerTab === 'Haddad') {
+        setActivePrayerTab('Asr');
+      }
+    });
     return () => unsubscribe();
-  }, [todayDate]);
+  }, [todayDate, activePrayerTab]);
 
   // Current cooking group & members
   const assignedCookingGroup = groups.find((g) => g.id === todayDuty?.group_id);
@@ -511,14 +516,16 @@ export const TodayOverview: React.FC = () => {
         >
           Asr
         </button>
-        <button
-          onClick={() => setActivePrayerTab('Haddad')}
-          className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
-            activePrayerTab === 'Haddad' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Haddad
-        </button>
+        {settings.haddad_enabled && (
+          <button
+            onClick={() => setActivePrayerTab('Haddad')}
+            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+              activePrayerTab === 'Haddad' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Haddad
+          </button>
+        )}
         <button
           onClick={() => setActivePrayerTab('Isha_Azaan')}
           className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
