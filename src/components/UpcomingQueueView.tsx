@@ -66,7 +66,7 @@ export const UpcomingQueueView: React.FC = () => {
   };
 
   const refreshData = () => {
-    setCookingQueue(dutyStore.getUpcomingCookingQueue(7));
+    setCookingQueue(dutyStore.getUpcomingCookingQueue());
     setAsrQueue(dutyStore.getUpcomingQueue('Asr', selectedImamPool));
     setHaddadQueue(dutyStore.getUpcomingQueue('Haddad'));
     setIshaAzaanQueue(dutyStore.getUpcomingQueue('Isha_Azaan'));
@@ -172,21 +172,27 @@ export const UpcomingQueueView: React.FC = () => {
                 key={item.duty.id}
                 className={`p-3.5 flex items-center justify-between transition-colors ${
                   item.isToday 
-                    ? item.duty.is_no_duty ? 'bg-purple-50/40' : 'bg-emerald-50/30' 
+                    ? 'bg-emerald-50/50' 
+                    : isCompleted
+                    ? 'bg-slate-50/40 opacity-75'
                     : 'hover:bg-slate-50/60'
                 }`}
               >
                 <div className="flex items-center space-x-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
                     item.isToday 
-                      ? item.duty.is_no_duty ? 'bg-purple-600 text-white' : 'bg-emerald-600 text-white' 
-                      : item.duty.is_no_duty ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
+                      ? 'bg-emerald-600 text-white shadow-xs' 
+                      : isCompleted
+                      ? 'bg-slate-200 text-slate-500'
+                      : 'bg-slate-100 text-slate-700'
                   }`}>
-                    {idx + 1}
+                    {isCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : item.group.id}
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm font-bold text-slate-900">
+                      <span className={`text-sm font-bold ${
+                        isCompleted ? 'text-slate-500 line-through' : 'text-slate-900'
+                      }`}>
                         {item.duty.is_no_duty ? 'Friday Off (No Food Duty)' : item.group.name}
                       </span>
                       {item.isToday && (
@@ -206,7 +212,9 @@ export const UpcomingQueueView: React.FC = () => {
                         </span>
                       ) : null}
                     </div>
-                    <p className={`text-xs font-medium mt-0.5 flex items-center space-x-2 ${item.duty.is_no_duty ? 'text-purple-600/80' : 'text-slate-500'}`}>
+                    <p className={`text-xs font-medium mt-0.5 flex items-center space-x-2 ${
+                      isCompleted ? 'text-slate-400 line-through' : item.duty.is_no_duty ? 'text-purple-600/80' : 'text-slate-500'
+                    }`}>
                       <span>{memberNames}</span>
                       {item.duty.is_temporary_swap && (
                         <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded leading-none">
@@ -232,7 +240,7 @@ export const UpcomingQueueView: React.FC = () => {
                   )}
                   <div>
                     <span className="text-xs font-semibold text-slate-600 block">
-                    {formatDateLabel(item.duty.duty_date, item.isToday, idx)}
+                    {formatDateLabel(item.duty.duty_date, item.isToday, 2)}
                   </span>
                   <div className="mt-0.5">
                     {item.duty.is_no_duty ? (
@@ -240,17 +248,16 @@ export const UpcomingQueueView: React.FC = () => {
                         Off Day
                       </span>
                     ) : isCompleted ? (
-                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center justify-end space-x-0.5">
-                        <CheckCircle2 className="w-3 h-3" />
+                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center justify-end space-x-0.5 bg-slate-100 px-2 py-0.5 rounded-full">
                         <span>Completed</span>
                       </span>
-                    ) : isPartial ? (
-                      <span className="text-[11px] font-semibold text-amber-600">
-                        In Progress
+                    ) : item.isToday ? (
+                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        Scheduled
                       </span>
                     ) : (
-                      <span className="text-[11px] text-slate-400">
-                        Pending
+                      <span className="text-[11px] font-medium text-slate-400">
+                        In Queue
                       </span>
                     )}
                   </div>

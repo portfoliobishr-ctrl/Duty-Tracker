@@ -87,17 +87,19 @@ class DutyStore {
       ]);
 
       if (e1 || e2 || e3 || e4 || e5 || e6) {
-        console.error("Supabase fetch errors:", { e1, e2, e3, e4, e5, e6 });
+        const errors = [e1, e2, e3, e4, e5, e6].filter(Boolean);
+        console.warn("Supabase fetch warning (using local fallback):", errors.map(e => (e as any)?.message || e));
         this.isSyncing = false;
+        this.state.isInitialized = true;
         this.notify();
         return false;
       }
 
-      if (groups && groups.length > 0) this.state.groups = groups;
-      if (students && students.length > 0) this.state.students = students;
-      if (cooking && cooking.length > 0) this.state.cooking_duties = cooking;
-      if (rounds && rounds.length > 0) this.state.rounds = rounds;
-      if (logs && logs.length > 0) this.state.imam_logs = logs;
+      if (groups) this.state.groups = groups.length > 0 ? groups : INITIAL_GROUPS;
+      if (students) this.state.students = students.length > 0 ? students : INITIAL_STUDENTS;
+      if (cooking) this.state.cooking_duties = cooking;
+      if (rounds) this.state.rounds = rounds.length > 0 ? rounds : INITIAL_ROUNDS;
+      if (logs) this.state.imam_logs = logs;
       if (settings && settings.length > 0) this.state.settings = settings[0];
                                     
       this.state.isInitialized = true;
@@ -107,7 +109,7 @@ class DutyStore {
       this.notify();
       return true;
     } catch (e) {
-      console.error('Failed to sync from database', e);
+      console.warn('Failed to sync from database (using local fallback):', e);
       this.isSyncing = false;
       this.notify();
       return false;
@@ -240,8 +242,8 @@ class DutyStore {
           default_holidays: this.state.settings.default_holidays,
           haddad_enabled: !current
         });
-      } catch (err) {
-        console.error('Failed to save haddad_enabled to supabase:', err);
+      } catch (err: any) {
+        console.warn('Failed to save haddad_enabled to supabase:', err.message);
       }
     }
     
@@ -265,8 +267,8 @@ class DutyStore {
       this.notify();
 
       if (isSupabaseConfigured() && supabase) {
-        supabase.from('students').update({ group_id: sOut.group_id }).eq('id', sOut.id).then(r => r.error && console.error(r.error));
-        supabase.from('students').update({ group_id: sIn.group_id }).eq('id', sIn.id).then(r => r.error && console.error(r.error));
+        supabase.from('students').update({ group_id: sOut.group_id }).eq('id', sOut.id).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
+        supabase.from('students').update({ group_id: sIn.group_id }).eq('id', sIn.id).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
       }
     } else {
       // Temporary: Override for a specific CookingDuty
@@ -307,7 +309,7 @@ class DutyStore {
           active_student_ids: duty.active_student_ids,
           is_temporary_swap: duty.is_temporary_swap,
           notes: duty.notes,
-        }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
+        }, { onConflict: 'duty_date' }).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
       }
     }
   }
@@ -327,7 +329,7 @@ class DutyStore {
       supabase.from('cooking_duties').update({
         active_student_ids: null,
         is_temporary_swap: false
-      }).eq('id', duty.id).then(r => r.error && console.error(r.error));
+      }).eq('id', duty.id).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
     }
   }
 
@@ -338,7 +340,7 @@ class DutyStore {
     if (isSupabaseConfigured() && supabase) {
       // Parallel updates for all 16 initial students
       INITIAL_STUDENTS.forEach(student => {
-        supabase!.from('students').update({ group_id: student.group_id }).eq('id', student.id).then();
+        supabase!.from('students').update({ group_id: student.group_id }).eq('id', student.id).then(undefined, (err: any) => console.warn("Supabase network error:", err.message));
       });
     }
   }
@@ -419,7 +421,7 @@ class DutyStore {
           name: params.name,
           is_holiday_only: params.is_holiday_only,
           description: params.description ?? groups[groupIdx].description,
-        }).eq('id', groupId).then(r => r.error && console.error(r.error));
+        }).eq('id', groupId).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
       }
     }
 
@@ -434,7 +436,7 @@ class DutyStore {
         if (isSupabaseConfigured() && supabase) {
           supabase.from('students').update({
             name: m.name.trim(),
-          }).eq('id', m.id).then(r => r.error && console.error(r.error));
+          }).eq('id', m.id).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
         }
       }
     });
@@ -612,7 +614,7 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
     }
 
     return duty;
@@ -648,7 +650,7 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
     }
 
     return duty;
@@ -688,7 +690,7 @@ class DutyStore {
         active_student_ids: targetDuty.active_student_ids || null,
         is_temporary_swap: targetDuty.is_temporary_swap || false,
         notes: targetDuty.notes,
-      }, { onConflict: 'duty_date' }).then();
+      }, { onConflict: 'duty_date' }).then(undefined, (err: any) => console.warn("Supabase network error:", err.message));
     }
 
     // Delete future uncompleted duties so they get regenerated correctly
@@ -698,7 +700,7 @@ class DutyStore {
        this.state.cooking_duties = this.state.cooking_duties.filter(d => !futureDuties.includes(d));
        if (isSupabaseConfigured() && supabase) {
          const futureIds = futureDuties.map(d => d.id);
-         supabase.from('cooking_duties').delete().in('id', futureIds).then();
+         supabase.from('cooking_duties').delete().in('id', futureIds).then(undefined, (err: any) => console.warn("Supabase network error:", err.message));
        }
     }
 
@@ -746,7 +748,7 @@ class DutyStore {
         active_student_ids: duty.active_student_ids || null,
         is_temporary_swap: duty.is_temporary_swap || false,
         notes: duty.notes,
-      }, { onConflict: 'duty_date' }).then(r => r.error && console.error(r.error));
+      }, { onConflict: 'duty_date' }).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
     }
 
     return duty;
@@ -778,31 +780,25 @@ class DutyStore {
     }
 
     if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase.from('cooking_duties').upsert({
-        id: duty.id,
-        duty_date: duty.duty_date,
-        group_id: duty.group_id,
-        is_holiday: duty.is_holiday,
-        breakfast_completed: duty.breakfast_completed,
-        breakfast_completed_at: duty.breakfast_completed_at,
-        lunch_completed: duty.lunch_completed,
-        lunch_completed_at: duty.lunch_completed_at,
-        active_student_ids: duty.active_student_ids || null,
-        is_temporary_swap: duty.is_temporary_swap || false,
-        notes: duty.notes,
-      }, { onConflict: 'duty_date' });
+      try {
+        const { error } = await supabase.from('cooking_duties').upsert({
+          id: duty.id,
+          duty_date: duty.duty_date,
+          group_id: duty.group_id,
+          is_holiday: duty.is_holiday,
+          breakfast_completed: duty.breakfast_completed,
+          breakfast_completed_at: duty.breakfast_completed_at,
+          lunch_completed: duty.lunch_completed,
+          lunch_completed_at: duty.lunch_completed_at,
+          active_student_ids: duty.active_student_ids || null,
+          is_temporary_swap: duty.is_temporary_swap || false,
+          notes: duty.notes,
+        }, { onConflict: 'duty_date' });
 
-      if (error) {
-        // Rollback
-        duty.breakfast_completed = originalBreakfast;
-        duty.breakfast_completed_at = originalBreakfastAt;
-        duty.lunch_completed = originalLunch;
-        duty.lunch_completed_at = originalLunchAt;
-        this.notify();
-        throw new Error(error.message);
+        if (error) console.warn("Supabase upsert error:", error.message);
+      } catch (e: any) {
+        console.warn("Supabase network error:", e.message);
       }
-    } else {
-      throw new Error('Supabase is not connected. Cannot save changes.');
     }
 
     this.notify();
@@ -956,19 +952,21 @@ class DutyStore {
     };
 
     if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase.from('imam_logs').insert({
-        id: newLog.id,
-        round_id: newLog.round_id,
-        date: newLog.date,
-        prayer_name: dutyType,
-        student_id: newLog.student_id,
-        status: newLog.status,
-        replacement_student_id: newLog.replacement_student_id,
-        notes: newLog.notes,
-      });
-      if (error) throw new Error(error.message);
-    } else {
-      throw new Error('Supabase is not connected. Cannot log duty.');
+      try {
+        const { error } = await supabase.from('imam_logs').insert({
+          id: newLog.id,
+          round_id: newLog.round_id,
+          date: newLog.date,
+          prayer_name: dutyType,
+          student_id: newLog.student_id,
+          status: newLog.status,
+          replacement_student_id: newLog.replacement_student_id,
+          notes: newLog.notes,
+        });
+        if (error) console.warn("Supabase insert error:", error.message);
+      } catch (e: any) {
+        console.warn("Supabase network error:", e.message);
+      }
     }
 
     logs.unshift(newLog);
@@ -1012,15 +1010,19 @@ class DutyStore {
       };
 
       if (isSupabaseConfigured() && supabase && newRound) {
-        await supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id);
-        await supabase.from('imam_rounds').insert({
-          id: newRound.id,
-          round_number: newRound.round_number,
-          pool: newRound.pool,
-          duty_type: newRound.duty_type,
-          status: 'active',
-          started_at: newRound.started_at,
-        });
+        try {
+          await supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id);
+          await supabase.from('imam_rounds').insert({
+            id: newRound.id,
+            round_number: newRound.round_number,
+            pool: newRound.pool,
+            duty_type: newRound.duty_type,
+            status: 'active',
+            started_at: newRound.started_at,
+          });
+        } catch (e: any) {
+          console.warn("Supabase network error:", e.message);
+        }
       }
 
       if (newRound) {
@@ -1052,7 +1054,7 @@ class DutyStore {
     this.notify();
 
     if (isSupabaseConfigured() && supabase) {
-      supabase.from('imam_rounds').update({ status: 'completed', completed_at: now }).eq('id', activeRound.id).then(r => r.error && console.error(r.error));
+      supabase.from('imam_rounds').update({ status: 'completed', completed_at: now }).eq('id', activeRound.id).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
       supabase.from('imam_rounds').insert({
         id: newRound.id,
         round_number: newRound.round_number,
@@ -1060,7 +1062,7 @@ class DutyStore {
         duty_type: newRound.duty_type,
         status: 'active',
         started_at: newRound.started_at,
-      }).then(r => r.error && console.error(r.error));
+      }).then(r => r.error && console.warn(r.error), (err: any) => console.warn("Supabase network error:", err.message));
     }
   }
 
@@ -1083,17 +1085,19 @@ class DutyStore {
         notes: 'Manually verified turn',
       });
     } else {
-      if (!isSupabaseConfigured() || !supabase) {
-        throw new Error('Supabase is not connected. Cannot delete log.');
-      }
-      
       const logsToDelete = logs.filter(
         (l) => l.round_id === activeRound.id && (l.student_id === studentId || l.replacement_student_id === studentId)
       );
 
-      for (const l of logsToDelete) {
-        const { error } = await supabase.from('imam_logs').delete().eq('id', l.id);
-        if (error) throw new Error(error.message);
+      if (isSupabaseConfigured() && supabase) {
+        for (const l of logsToDelete) {
+          try {
+            const { error } = await supabase.from('imam_logs').delete().eq('id', l.id);
+            if (error) console.warn("Supabase delete error:", error.message);
+          } catch (e: any) {
+            console.warn("Supabase network error:", e.message);
+          }
+        }
       }
 
       this.state.imam_logs = logs.filter(
@@ -1293,7 +1297,7 @@ class DutyStore {
   }
 
   // --- UPCOMING COOKING QUEUE (EVENT-DRIVEN PROJECTION) ---
-  public getUpcomingCookingQueue(daysCount = 7): {
+  public getUpcomingCookingQueue(): {
     duty: CookingDuty;
     group: Group;
     members: Student[];
@@ -1304,10 +1308,11 @@ class DutyStore {
     const groupsWithMembers = this.getGroupsWithMembers();
     const settings = this.getSystemSettings();
 
-    // Start projections from the currently active uncompleted groups
-    // Start projections from the currently active uncompleted groups
-    let nextReg = this.getActiveCookingGroup(false, today);
-    let nextHol = this.getActiveCookingGroup(true, today);
+    // Ensure we have enough duties projected to find upcoming dates
+    this.ensureDutiesRange(-7, 21);
+
+    const activeReg = this.getActiveCookingGroup(false, today);
+    const activeHol = this.getActiveCookingGroup(true, today);
 
     const queueItems: {
       duty: CookingDuty;
@@ -1316,92 +1321,84 @@ class DutyStore {
       isToday: boolean;
     }[] = [];
 
-    for (let offset = 0; offset < daysCount; offset++) {
-      const dateStr = getRelativeDateString(offset);
-      const isToday = offset === 0;
+    for (let groupId = 1; groupId <= 8; groupId++) {
+      const isCollege = groupId >= 6;
+      const activeGrp = isCollege ? activeHol : activeReg;
+      const isCompletedInCycle = groupId < activeGrp;
 
-      if (isFriday(dateStr)) {
-        const existing = duties.find((d) => d.duty_date === dateStr);
-        const duty: CookingDuty = existing || {
-          id: `duty-${dateStr}`,
-          duty_date: dateStr,
-          group_id: null,
-          is_holiday: false,
-          is_no_duty: true,
-          breakfast_completed: false,
-          lunch_completed: false,
-          notes: 'Friday - No Food Duty (Morning & Evening)',
-          created_at: new Date().toISOString(),
+      let targetDuty: CookingDuty | undefined;
+
+      if (isCompletedInCycle) {
+        // Find their most recent completed duty
+        const pastDuties = duties.filter(d => d.group_id === groupId && d.duty_date <= today && (d.breakfast_completed || d.lunch_completed));
+        targetDuty = pastDuties.sort((a, b) => b.duty_date.localeCompare(a.duty_date))[0];
+      }
+
+      if (!targetDuty) {
+        // Project forward to find their next duty
+        let projectedReg = activeReg;
+        let projectedHol = activeHol;
+        
+        for (let offset = 0; offset < 30; offset++) {
+          const dateStr = getRelativeDateString(offset);
+          if (isFriday(dateStr)) continue;
+          
+          const isHol = isHolidayOrSunday(dateStr, settings.default_holidays);
+          const existing = duties.find((d) => d.duty_date === dateStr);
+          
+          let assignedId: number;
+          if (existing && (existing.breakfast_completed || existing.lunch_completed || existing.notes?.includes('Manual override')) && existing.group_id) {
+            assignedId = existing.group_id;
+            if (isHol) projectedHol = assignedId; else projectedReg = assignedId;
+          } else {
+            assignedId = isHol ? projectedHol : projectedReg;
+          }
+
+          if (assignedId === groupId) {
+            targetDuty = existing || {
+              id: `duty-${dateStr}`,
+              duty_date: dateStr,
+              group_id: assignedId,
+              is_holiday: isHol,
+              is_no_duty: false,
+              breakfast_completed: false,
+              lunch_completed: false,
+              notes: isHol ? 'College Team (Holiday / Weekend)' : null,
+              created_at: new Date().toISOString(),
+            };
+            break;
+          }
+
+          if (isHol) {
+            projectedHol = ((projectedHol - 6 + 1) % 3) + 6;
+          } else {
+            projectedReg = (projectedReg % 5) + 1;
+          }
+        }
+      }
+
+      if (targetDuty) {
+        const group = groupsWithMembers.find(g => g.id === groupId) || {
+          id: groupId,
+          name: `Group ${groupId}`,
+          is_holiday_only: isCollege,
+          members: []
         };
+        let actualMembers = group.members || [];
+        if (targetDuty.active_student_ids && targetDuty.active_student_ids.length > 0) {
+          actualMembers = targetDuty.active_student_ids.map(id => this.getStudents().find(s => s.id === id)).filter(Boolean) as Student[];
+        }
 
         queueItems.push({
-          duty,
-          group: {
-            id: 0,
-            name: 'Friday Off',
-            is_holiday_only: false,
-            members: [],
-          },
-          members: [],
-          isToday,
+          duty: { ...targetDuty, group_id: groupId },
+          group,
+          members: actualMembers,
+          isToday: targetDuty.duty_date === today,
         });
-        continue;
-      }
-
-      const isHoliday = isHolidayOrSunday(dateStr, settings.default_holidays);
-      const existing = duties.find((d) => d.duty_date === dateStr);
-      let assignedId: number;
-
-      if (existing && (existing.breakfast_completed || existing.lunch_completed || existing.notes?.includes('Manual override')) && existing.group_id) {
-        assignedId = existing.group_id;
-        // Update the running pointer so sequence continues from this duty
-        if (isHoliday) {
-          nextHol = assignedId;
-        } else {
-          nextReg = assignedId;
-        }
-      } else {
-        assignedId = isHoliday ? nextHol : nextReg;
-      }
-
-      const duty: CookingDuty = existing || {
-        id: `duty-${dateStr}`,
-        duty_date: dateStr,
-        group_id: assignedId,
-        is_holiday: isHoliday,
-        is_no_duty: false,
-        breakfast_completed: false,
-        lunch_completed: false,
-        notes: isHoliday ? 'College Team (Holiday / Weekend)' : null,
-        created_at: new Date().toISOString(),
-      };
-
-      const g = groupsWithMembers.find((item) => item.id === assignedId);
-      let actualMembers = g?.members || [];
-      if (duty.active_student_ids && duty.active_student_ids.length > 0) {
-        actualMembers = duty.active_student_ids.map(id => this.getStudents().find(s => s.id === id)).filter(Boolean) as Student[];
-      }
-
-      queueItems.push({
-        duty: { ...duty, group_id: assignedId },
-        group: g || {
-          id: assignedId,
-          name: `Group ${assignedId}`,
-          is_holiday_only: assignedId >= 6,
-          members: [],
-        },
-        members: actualMembers,
-        isToday,
-      });
-
-      // Project sequence advance for subsequent days in preview
-      if (isHoliday) {
-        nextHol = ((nextHol - 6 + 1) % 3) + 6;
-      } else {
-        nextReg = (nextReg % 5) + 1;
       }
     }
 
+    queueItems.sort((a, b) => a.duty.duty_date.localeCompare(b.duty.duty_date));
     return queueItems;
   }
 

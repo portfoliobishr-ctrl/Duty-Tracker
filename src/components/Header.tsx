@@ -5,7 +5,9 @@ import {
   Database, 
   RotateCcw, 
   Compass,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { dutyStore } from '@/lib/dutyStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -49,6 +51,22 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSupabaseModal }) => {
     dutyStore.setSelectedDate(e.target.value ? e.target.value : null);
   };
 
+  const handlePrevDay = () => {
+    const current = dutyStore.getToday();
+    current.setDate(current.getDate() - 1);
+    dutyStore.setSelectedDate(current.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    const current = dutyStore.getToday();
+    current.setDate(current.getDate() + 1);
+    dutyStore.setSelectedDate(current.toISOString().split('T')[0]);
+  };
+
+  const handleGoToday = () => {
+    dutyStore.setSelectedDate(null);
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-slate-200/80 transition-all">
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
@@ -71,19 +89,47 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSupabaseModal }) => {
             </div>
           </div>
 
-          {/* Right Date Badge */}
-          <div className="flex items-center space-x-1.5 text-[11px] sm:text-xs text-slate-500 font-medium pl-3 pr-1.5 py-1 rounded-full bg-slate-100/80 border border-slate-200/60">
-            <span suppressHydrationWarning className="text-slate-800 font-semibold whitespace-nowrap">{mounted ? formattedDate : ''}</span>
-            <div className="relative flex items-center justify-center w-6 h-6 rounded-full hover:bg-slate-200 transition-colors">
+          {/* Center/Right Date Navigation */}
+          <div className="flex items-center space-x-1 sm:space-x-2 bg-slate-100/80 rounded-full p-1 border border-slate-200/60">
+            <button 
+              onClick={handlePrevDay}
+              className="p-1 sm:p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+              title="Previous Day"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+
+            <button 
+              onClick={handleGoToday}
+              className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-[10px] sm:text-xs font-semibold transition-colors"
+              title="Go to Today"
+            >
+              Today
+            </button>
+
+            <div className="relative flex items-center justify-center px-1 sm:px-2 rounded-full hover:bg-slate-200 transition-colors cursor-pointer group">
+              <span suppressHydrationWarning className="text-slate-800 text-[11px] sm:text-xs font-bold whitespace-nowrap group-hover:opacity-0 transition-opacity">
+                {mounted ? formattedDate : ''}
+              </span>
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-emerald-600">
+                <Calendar className="w-4 h-4" />
+              </div>
               <input 
                 type="date" 
                 value={dutyStore.getTodayStr()}
                 onChange={handleDateChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                title="Change Date"
+                title="Pick Date"
               />
-              <Calendar className="w-3.5 h-3.5 text-slate-500" />
             </div>
+
+            <button 
+              onClick={handleNextDay}
+              className="p-1 sm:p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+              title="Next Day"
+            >
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
           </div>
         </div>
       </div>

@@ -27,6 +27,7 @@ import {
 import { PrayerLoggerModal } from './PrayerLoggerModal';
 import { SwapMemberModal } from './SwapMemberModal';
 import { PrayerDutyCard } from './PrayerDutyCard';
+import { ChangeGroupModal } from './ChangeGroupModal';
 import confetti from 'canvas-confetti';
 
 export const TodayOverview: React.FC = () => {
@@ -52,6 +53,7 @@ export const TodayOverview: React.FC = () => {
   const [activeModalDuty, setActiveModalDuty] = useState<'Asr' | 'Haddad' | 'Isha_Azaan'>('Asr');
   const [activePrayerTab, setActivePrayerTab] = useState<'Asr' | 'Haddad' | 'Isha_Azaan'>('Asr');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [changeGroupModalOpen, setChangeGroupModalOpen] = useState(false);
 
   const { showToast } = useToast();
 
@@ -217,8 +219,8 @@ export const TodayOverview: React.FC = () => {
   } : null;
 
   // Next Cooking queue item (used in action cards)
-  const upcomingCookingQueue = dutyStore.getUpcomingCookingQueue(7);
-  const nextCookingItem = upcomingCookingQueue.find((item) => !item.isToday && !item.duty.is_no_duty);
+  const upcomingCookingQueue = dutyStore.getUpcomingCookingQueue();
+  const nextCookingItem = upcomingCookingQueue.find((item) => item.duty.duty_date > todayDate && !item.duty.is_no_duty);
 
   // Stable label for tomorrow's team type — use pre-computed isTomorrowHoliday to avoid SSR/client mismatch
   const nextCookingTeamLabel = isTomorrowHoliday ? 'College Team' : 'Regular Team';
@@ -366,6 +368,13 @@ export const TodayOverview: React.FC = () => {
                 <Clock3 className="w-3.5 h-3.5 text-slate-400" />
                 <span>{formattedToday}</span>
               </div>
+              <button 
+                onClick={() => setChangeGroupModalOpen(true)}
+                className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 text-[10px] sm:text-xs font-bold transition-colors"
+                title="Edit Duty / Change Group"
+              >
+                Edit Duty
+              </button>
               {assignedCookingGroup && (
                 <button 
                   onClick={() => setSwapModalOpen(true)}
@@ -575,6 +584,17 @@ export const TodayOverview: React.FC = () => {
         onSuccess={() => {
           refreshData();
           setSwapModalOpen(false);
+        }}
+      />
+
+      <ChangeGroupModal
+        isOpen={changeGroupModalOpen}
+        onClose={() => setChangeGroupModalOpen(false)}
+        dutyDate={todayDate}
+        currentGroupId={todayDuty?.group_id || null}
+        onSuccess={() => {
+          refreshData();
+          setChangeGroupModalOpen(false);
         }}
       />
     </div>
