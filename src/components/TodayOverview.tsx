@@ -6,7 +6,8 @@ import {
   Student, 
   Group, 
   ImamLog,
-  DailyImamState
+  DailyImamState,
+  PrayerSlotName
 } from '@/types/database';
 import { dutyStore } from '@/lib/dutyStore';
 import { getRelativeDateString, isFriday, isHolidayOrSunday } from '@/lib/seedData';

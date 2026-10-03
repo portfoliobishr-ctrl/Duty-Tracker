@@ -812,8 +812,7 @@ class DutyStore {
       }, { onConflict: 'duty_date' })
       .then(({ error }) => {
         if (error) console.warn("Supabase upsert error:", error.message);
-      })
-      .catch((e: any) => console.warn("Supabase network error:", e.message));
+      }, (e: any) => console.warn("Supabase network error:", e.message));
     }
 
     return duty;
@@ -1071,12 +1070,12 @@ class DutyStore {
         status: newLog.status,
         replacement_student_id: newLog.replacement_student_id,
         notes: newLog.notes,
-      }).then(r => r.error && console.warn("Supabase insert error:", r.error.message))
-      .catch((e: any) => console.warn("Supabase network error:", e.message));
+      }).then(r => r.error && console.warn("Supabase insert error:", r.error.message),
+              (e: any) => console.warn("Supabase network error:", e.message));
 
       if (roundAdvanced && newRound) {
         supabase.from('imam_rounds').update({ status: 'completed', completed_at: activeRound.completed_at }).eq('id', activeRound.id)
-          .catch((e: any) => console.warn("Supabase network error:", e.message));
+          .then(undefined, (e: any) => console.warn("Supabase network error:", e.message));
         
         supabase.from('imam_rounds').insert({
           id: newRound.id,
@@ -1085,7 +1084,7 @@ class DutyStore {
           duty_type: newRound.duty_type,
           status: 'active',
           started_at: newRound.started_at,
-        }).catch((e: any) => console.warn("Supabase network error:", e.message));
+        }).then(undefined, (e: any) => console.warn("Supabase network error:", e.message));
       }
     }
 
@@ -1106,8 +1105,8 @@ class DutyStore {
 
     if (isSupabaseConfigured() && supabase) {
       supabase.from('imam_logs').delete().eq('id', logToDelete.id)
-        .then(r => r.error && console.warn("Supabase delete error:", r.error.message))
-        .catch((e: any) => console.warn("Supabase network error:", e.message));
+        .then(r => r.error && console.warn("Supabase delete error:", r.error.message),
+              (e: any) => console.warn("Supabase network error:", e.message));
     }
   }
 
@@ -1388,8 +1387,8 @@ class DutyStore {
     // Ensure we have enough duties projected to find upcoming dates
     this.ensureDutiesRange(-7, 21);
 
-    const activeReg = this.getActiveCookingGroup(false, today);
-    const activeHol = this.getActiveCookingGroup(true, today);
+    const activeReg = this.getActiveCookingGroup(false);
+    const activeHol = this.getActiveCookingGroup(true);
 
     const queueItems: {
       duty: CookingDuty;
