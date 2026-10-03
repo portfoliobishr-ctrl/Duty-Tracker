@@ -68,47 +68,40 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSupabaseModal }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-slate-200/80 transition-all">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+    <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-slate-200/80 transition-all shrink-0">
+      <div className="max-w-4xl mx-auto px-2 sm:px-6">
+        <div className="flex items-center justify-between py-2 gap-2">
           
           {/* Logo & App Mark */}
-          <div className="flex items-center space-x-2.5">
-            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/20">
+          <div className="flex items-center justify-start gap-2 shrink-0">
+            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/20">
               <Compass className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight">
-                  DutyTracker
-                </span>
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                  Rotation
-                </span>
-              </div>
-            </div>
+            <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight">
+              DutyTracker
+            </span>
           </div>
 
-          {/* Center/Right Date Navigation */}
-          <div className="flex items-center space-x-1 sm:space-x-2 bg-slate-100/80 rounded-full p-1 border border-slate-200/60">
+          {/* Right Date Navigation */}
+          <div className="flex items-center space-x-0.5 bg-slate-100/80 rounded-full p-0.5 border border-slate-200/60 shrink-0">
             <button 
               onClick={handlePrevDay}
-              className="p-1 sm:p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+              className="p-1 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shrink-0"
               title="Previous Day"
             >
-              <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
 
             <button 
               onClick={handleGoToday}
-              className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-[10px] sm:text-xs font-semibold transition-colors"
+              className="px-2.5 py-1 rounded-full hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold transition-colors shrink-0"
               title="Go to Today"
             >
               Today
             </button>
 
-            <div className="relative flex items-center justify-center px-1 sm:px-2 rounded-full hover:bg-slate-200 transition-colors cursor-pointer group">
-              <span suppressHydrationWarning className="text-slate-800 text-[11px] sm:text-xs font-bold whitespace-nowrap group-hover:opacity-0 transition-opacity">
+            <div className="relative flex items-center justify-center px-1.5 rounded-full hover:bg-slate-200 transition-colors cursor-pointer group shrink-0">
+              <span suppressHydrationWarning className="text-slate-800 text-xs font-bold whitespace-nowrap group-hover:opacity-0 transition-opacity">
                 {mounted ? formattedDate : ''}
               </span>
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-emerald-600">
@@ -125,10 +118,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSupabaseModal }) => {
 
             <button 
               onClick={handleNextDay}
-              className="p-1 sm:p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+              className="p-1 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shrink-0"
               title="Next Day"
             >
-              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>

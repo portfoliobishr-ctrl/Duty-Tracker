@@ -50,9 +50,9 @@ export const TabsNav: React.FC<TabsNavProps> = ({ activeTab, onChangeTab }) => {
       {/* Mobile Sticky Bottom Navigation Bar (Minimum 48px Touch Targets) */}
       <nav 
         aria-label="Mobile Navigation"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 px-3 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+        className="sm:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 z-50 h-16 flex items-center justify-around"
       >
-        <div className="flex items-center justify-around max-w-md mx-auto">
+        <div className="flex items-center justify-around w-full max-w-md mx-auto h-full">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -60,7 +60,7 @@ export const TabsNav: React.FC<TabsNavProps> = ({ activeTab, onChangeTab }) => {
               <button
                 key={tab.id}
                 onClick={() => onChangeTab(tab.id)}
-                className={`flex-1 flex flex-col items-center justify-center min-h-[52px] py-1 px-2 rounded-2xl transition-all active:scale-95 ${
+                className={`flex-1 flex flex-col items-center justify-center h-full transition-all active:scale-95 ${
                   isActive
                     ? 'text-emerald-700 font-bold'
                     : 'text-slate-400 hover:text-slate-600'

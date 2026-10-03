@@ -22,12 +22,14 @@ import {
   Users2,
   Clock3,
   Coffee,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Sun
 } from 'lucide-react';
 import { PrayerLoggerModal } from './PrayerLoggerModal';
 import { SwapMemberModal } from './SwapMemberModal';
 import { PrayerDutyCard } from './PrayerDutyCard';
 import { ChangeGroupModal } from './ChangeGroupModal';
+import { EditDutyModal, EditDutyMode } from './EditDutyModal';
 import confetti from 'canvas-confetti';
 
 export const TodayOverview: React.FC = () => {
@@ -48,12 +50,12 @@ export const TodayOverview: React.FC = () => {
   } | null>(null);
   const [dailyImamState, setDailyImamState] = useState<DailyImamState | null>(() => dutyStore.getDailyImamState(getRelativeDateString(0)));
 
-  // Modal for Substitute / No Imam
   const [prayerModalOpen, setPrayerModalOpen] = useState(false);
-  const [activeModalDuty, setActiveModalDuty] = useState<'Asr' | 'Haddad' | 'Isha_Azaan'>('Asr');
-  const [activePrayerTab, setActivePrayerTab] = useState<'Asr' | 'Haddad' | 'Isha_Azaan'>('Asr');
+  const [prayerDutyMode, setPrayerDutyMode] = useState<PrayerSlotName>('Asr');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [changeGroupModalOpen, setChangeGroupModalOpen] = useState(false);
+  const [editDutyModalOpen, setEditDutyModalOpen] = useState(false);
+  const [editDutyMode, setEditDutyMode] = useState<EditDutyMode>('Cooking');
 
   const { showToast } = useToast();
 
@@ -77,13 +79,10 @@ export const TodayOverview: React.FC = () => {
     refreshData();
     const unsubscribe = dutyStore.subscribe(() => {
       refreshData();
-      if (!dutyStore.getSystemSettings().haddad_enabled && activePrayerTab === 'Haddad') {
-        setActivePrayerTab('Asr');
-      }
     });
     return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayDate, activePrayerTab]);
+  }, [todayDate]);
 
   // Current cooking group & members
   const assignedCookingGroup = groups.find((g) => g.id === todayDuty?.group_id);
@@ -179,7 +178,7 @@ export const TodayOverview: React.FC = () => {
   };
 
   // Format today cleanly (e.g., "Thursday, Sep 10")
-  const formattedToday = new Date().toLocaleDateString('en-US', {
+  const formattedToday = dutyStore.getToday().toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -203,7 +202,7 @@ export const TodayOverview: React.FC = () => {
   const activeStudent = pendingSubstituteStudent || assignedAsr?.student;
 
   // Next Asr candidate for upcoming duty (after today)
-  const tomorrowDate = getRelativeDateString(1);
+  const tomorrowDate = getRelativeDateString(1, dutyStore.getToday());
   const settings = dutyStore.getSystemSettings();
   const isTomorrowHoliday = isHolidayOrSunday(tomorrowDate, settings.default_holidays);
   const tomorrowPool: 'regular' | 'college' = isTomorrowHoliday ? 'college' : 'regular';
@@ -218,209 +217,72 @@ export const TodayOverview: React.FC = () => {
     totalInPool: tomorrowAsrQueue.queue.length,
   } : null;
 
-  // Next Cooking queue item (used in action cards)
-  const upcomingCookingQueue = dutyStore.getUpcomingCookingQueue();
-  const nextCookingItem = upcomingCookingQueue.find((item) => item.duty.duty_date > todayDate && !item.duty.is_no_duty);
 
-  // Stable label for tomorrow's team type — use pre-computed isTomorrowHoliday to avoid SSR/client mismatch
-  const nextCookingTeamLabel = isTomorrowHoliday ? 'College Team' : 'Regular Team';
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto pb-6">
+    <div className="flex-1 flex flex-col gap-3 w-full max-w-lg mx-auto pb-6">
       
-      {/* 1. Holiday Switch: Clean single toggle */}
-      <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-sm flex items-center justify-between transition-all">
-        <div className="flex items-center space-x-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-            isNoFoodDuty ? 'bg-purple-100 text-purple-700' : isHoliday ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-          }`}>
-            <Calendar className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-bold text-slate-900">
-                {isNoFoodDuty ? 'Friday Routine' : 'Holiday Today?'}
+      {/* Cooking Card */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col gap-3 w-full min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-8 h-8 shrink-0 rounded-xl flex items-center justify-center shadow-xs ${isNoFoodDuty ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
+              <Utensils className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
+                {isNoFoodDuty ? 'No Food Duty' : (assignedCookingGroup?.name || `Group ${todayDuty?.group_id || 4}`)}
+              </h2>
+            </div>
+            {isNoFoodDuty && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 shrink-0 ml-1">
+                Friday Off
               </span>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                isNoFoodDuty
-                  ? 'bg-purple-100 text-purple-800'
-                  : isHoliday 
-                    ? 'bg-amber-100 text-amber-800' 
-                    : 'bg-emerald-100/70 text-emerald-800'
-              }`}>
-                {isNoFoodDuty ? 'No Food Duty Day' : isHoliday ? 'College Teams' : 'Regular Teams'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {isNoFoodDuty 
-                ? 'Mess off day • No morning or evening cooking duty' 
-                : isHoliday ? 'Using College students schedule' : 'Standard working day rotation'}
-            </p>
-          </div>
-        </div>
-
-        {/* Toggle Switch */}
-        <button
-          type="button"
-          onClick={handleToggleHoliday}
-          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${
-            isHoliday ? 'bg-amber-500' : 'bg-slate-300'
-          }`}
-          aria-label="Toggle Holiday"
-        >
-          <span
-            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
-              isHoliday ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* 2. Today's Cooking Card */}
-      {isNoFoodDuty ? (
-        <section className="bg-white rounded-2xl border border-purple-200/90 shadow-sm overflow-hidden transition-all">
-          {/* Card Header */}
-          <div className="p-4 border-b border-purple-100 bg-gradient-to-r from-purple-50/70 via-indigo-50/40 to-white flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shadow-xs">
-                <Utensils className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">
-                  Friday Routine
-                </span>
-                <h2 className="text-base font-bold text-slate-900 leading-tight">
-                  No Food Duty Today
-                </h2>
-              </div>
-            </div>
-
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200/60">
-              Friday Off
-            </span>
-          </div>
-
-          {/* Meals Status Banner */}
-          <div className="p-4 space-y-3">
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="flex items-center space-x-2 text-xs font-semibold text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200/60">
-                  <Coffee className="w-4 h-4 text-amber-500 shrink-0" />
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Morning Meal</span>
-                    <span className="font-bold text-slate-900">Breakfast: No Duty</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 text-xs font-semibold text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200/60">
-                  <Utensils className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Evening Meal</span>
-                    <span className="font-bold text-slate-900">Lunch: No Duty</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-500 pt-0.5">
-                On Fridays, food duty is off for both morning and evening meals. Weekend College Team cooking resumes on Saturday.
-              </p>
-            </div>
-
-            {/* Next Scheduled Team */}
-            {nextCookingItem && (
-              <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/70 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
-                    Next Cooking Team (Tomorrow - {nextCookingTeamLabel})
-                  </span>
-                  <span className="text-xs font-bold text-slate-900">
-                    {nextCookingItem.group.name}
-                    {nextCookingItem.members.length > 0 && (
-                      <span className="font-normal text-slate-600"> ({nextCookingItem.members.map((m) => m.name).join(' & ')})</span>
-                    )}
-                  </span>
-                </div>
-                <span className="text-[11px] font-bold text-amber-900 bg-amber-200/60 px-2 py-0.5 rounded-md">
-                  Saturday (Holiday)
-                </span>
-              </div>
             )}
-          </div>
-        </section>
-      ) : (
-        <section className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden transition-all">
-          {/* Card Header */}
-          <div className="p-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center shadow-xs">
-                <Utensils className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Cooking Duty
-                </span>
-                <h2 className="text-base font-bold text-slate-900 leading-tight">
-                  {assignedCookingGroup?.name || `Group ${todayDuty?.group_id || 4}`}
-                </h2>
-              </div>
-            </div>
 
-            <div className="flex items-center space-x-3">
+          </div>
+          
+          </div>
+
+        {/* Students Assigned */}
+        {!isNoFoodDuty && (
+          <div className="flex flex-col gap-2 mt-1">
+            <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-medium">
                 <Clock3 className="w-3.5 h-3.5 text-slate-400" />
                 <span>{formattedToday}</span>
-              </div>
-              <button 
-                onClick={() => setChangeGroupModalOpen(true)}
-                className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 text-[10px] sm:text-xs font-bold transition-colors"
-                title="Edit Duty / Change Group"
-              >
-                Edit Duty
-              </button>
-              {assignedCookingGroup && (
-                <button 
-                  onClick={() => setSwapModalOpen(true)}
-                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 transition-colors"
-                  title="Swap Member"
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Students Assigned */}
-          <div className="px-4 py-3.5 bg-slate-50/60 border-b border-slate-100">
-            <div className="text-[11px] font-semibold text-slate-500 mb-1.5 flex items-center justify-between">
-              <div className="flex items-center space-x-1">
-                <Users2 className="w-3.5 h-3.5" />
-                <span>Assigned Cooking Pair:</span>
-              </div>
-              {todayDuty?.is_temporary_swap && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
-                    Temporary Swap
+                {todayDuty?.is_temporary_swap && (
+                  <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">
+                    Swap
                   </span>
-                  {!(isBreakfastDone && isLunchDone) && (
-                    <button 
-                      onClick={() => {
-                        dutyStore.revertCookingDutySwap(todayDate);
-                        refreshData();
-                      }}
-                      className="text-[9px] font-bold text-slate-500 hover:text-amber-700 hover:underline"
-                    >
-                      Revert
-                    </button>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setChangeGroupModalOpen(true)}
+                  className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] font-bold transition-colors"
+                >
+                  Edit
+                </button>
+                {assignedCookingGroup && (
+                  <button 
+                    onClick={() => setSwapModalOpen(true)}
+                    className="p-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 transition-colors"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {cookingMembers.length > 0 ? (
                 cookingMembers.map((member) => (
                   <div 
                     key={member.id}
-                    className="bg-white px-3 py-2 rounded-xl border border-slate-200/80 flex items-center space-x-2"
+                    className="bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex items-center space-x-2"
                   >
-                    <div className="w-6 h-6 rounded-lg bg-orange-50 text-orange-700 text-xs font-bold flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-lg bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">
                       {member.name.charAt(0)}
                     </div>
                     <span className="text-sm font-semibold text-slate-800 truncate">
@@ -435,123 +297,74 @@ export const TodayOverview: React.FC = () => {
               )}
             </div>
           </div>
+        )}
 
-          {/* Action Buttons: Breakfast Done & Lunch Done (>= 48px height) */}
-          <div className="p-4 space-y-2.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* Breakfast Button */}
-              <button
-                type="button"
-                onClick={() => handleToggleMeal('breakfast')}
-                className={`min-h-[48px] w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-all active:scale-[0.98] ${
-                  isBreakfastDone
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80 border border-slate-200/60'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs ${
-                    isBreakfastDone ? 'bg-white/20 text-white' : 'bg-white text-slate-500 shadow-xs'
-                  }`}>
-                    {isBreakfastDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '1'}
-                  </div>
-                  <span>Breakfast</span>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-md font-semibold ${
-                  isBreakfastDone ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
-                }`}>
-                  {isBreakfastDone ? 'Done' : 'Mark Done'}
-                </span>
-              </button>
-
-              {/* Lunch Button */}
-              <button
-                type="button"
-                onClick={() => handleToggleMeal('lunch')}
-                className={`min-h-[48px] w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-all active:scale-[0.98] ${
-                  isLunchDone
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80 border border-slate-200/60'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs ${
-                    isLunchDone ? 'bg-white/20 text-white' : 'bg-white text-slate-500 shadow-xs'
-                  }`}>
-                    {isLunchDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '2'}
-                  </div>
-                  <span>Lunch</span>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-md font-semibold ${
-                  isLunchDone ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
-                }`}>
-                  {isLunchDone ? 'Done' : 'Mark Done'}
-                </span>
-              </button>
-            </div>
-
-            {/* Next Cooking Team (Always Visible) */}
-            {nextCookingItem && (
-              <div className="p-3.5 rounded-xl bg-gradient-to-r from-orange-50/90 to-amber-50/70 border border-orange-200/80 flex items-center justify-between shadow-2xs animate-in fade-in duration-200">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-xs">
-                    <Utensils className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-orange-800 block">
-                      Next Cooking Team (Tomorrow)
-                    </span>
-                    <span className="text-xs font-bold text-slate-900">
-                      {nextCookingItem.group.name}
-                      {nextCookingItem.members.length > 0 && (
-                        <span className="font-normal text-slate-600"> ({nextCookingItem.members.map((m) => m.name).join(' & ')})</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-orange-800 bg-orange-200/70 px-2 py-0.5 rounded-md border border-orange-300/60">
-                  Up Next
-                </span>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* 3. Prayer Duties Segmented Control */}
-      <div className="bg-slate-100/80 p-1 rounded-xl flex items-center mb-4 border border-slate-200/50">
-        <button
-          onClick={() => setActivePrayerTab('Asr')}
-          className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
-            activePrayerTab === 'Asr' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Asr
-        </button>
-        {settings.haddad_enabled && (
-          <button
-            onClick={() => setActivePrayerTab('Haddad')}
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
-              activePrayerTab === 'Haddad' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+        {/* Meals Action Rows */}
+        <div className="flex flex-col gap-2 mt-1">
+          {/* Breakfast */}
+          <div 
+            onClick={() => !isNoFoodDuty && handleToggleMeal('breakfast')}
+            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+              isNoFoodDuty 
+                ? 'bg-slate-50 border-slate-100' 
+                : 'cursor-pointer select-none active:scale-[0.99] ' + (isBreakfastDone ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-100 hover:bg-slate-100')
             }`}
           >
-            Haddad
-          </button>
-        )}
-        <button
-          onClick={() => setActivePrayerTab('Isha_Azaan')}
-          className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
-            activePrayerTab === 'Isha_Azaan' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Azaan
-        </button>
-      </div>
+            <div className="flex items-center gap-2">
+              <Coffee className={`w-4 h-4 ${isNoFoodDuty ? 'text-slate-400' : isBreakfastDone ? 'text-emerald-500' : 'text-slate-500'}`} />
+              <span className="text-sm font-semibold text-slate-800">Breakfast</span>
+            </div>
+            {isNoFoodDuty ? (
+              <span className="text-xs font-bold px-2 py-1 rounded bg-slate-200/80 text-slate-500">Off</span>
+            ) : (
+              <span
+                className={`text-xs font-bold px-2 py-1 rounded-md transition-all ${
+                  isBreakfastDone ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-white text-slate-700 border border-slate-200 shadow-sm'
+                }`}
+              >
+                {isBreakfastDone ? 'Done' : 'Mark Done'}
+              </span>
+            )}
+          </div>
+          
+          {/* Lunch */}
+          <div 
+            onClick={() => !isNoFoodDuty && handleToggleMeal('lunch')}
+            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+              isNoFoodDuty 
+                ? 'bg-slate-50 border-slate-100' 
+                : 'cursor-pointer select-none active:scale-[0.99] ' + (isLunchDone ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-100 hover:bg-slate-100')
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Sun className={`w-4 h-4 ${isNoFoodDuty ? 'text-slate-400' : isLunchDone ? 'text-emerald-500' : 'text-slate-500'}`} />
+              <span className="text-sm font-semibold text-slate-800">Lunch</span>
+            </div>
+            {isNoFoodDuty ? (
+              <span className="text-xs font-bold px-2 py-1 rounded bg-slate-200/80 text-slate-500">Off</span>
+            ) : (
+              <span
+                className={`text-xs font-bold px-2 py-1 rounded-md transition-all ${
+                  isLunchDone ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-white text-slate-700 border border-slate-200 shadow-sm'
+                }`}
+              >
+                {isLunchDone ? 'Done' : 'Mark Done'}
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         <PrayerDutyCard 
-          dutyType={activePrayerTab} 
-          onOpenModal={() => { setActiveModalDuty(activePrayerTab); setPrayerModalOpen(true); }} 
+          onOpenModal={(type) => {
+            setPrayerDutyMode(type);
+            setPrayerModalOpen(true);
+          }} 
+          onOpenEditModal={(type) => {
+            setEditDutyMode(type);
+            setEditDutyModalOpen(true);
+          }}
         />
       </div>
 
@@ -560,7 +373,7 @@ export const TodayOverview: React.FC = () => {
         isOpen={prayerModalOpen}
         onClose={() => setPrayerModalOpen(false)}
         defaultDate={todayDate}
-        dutyType={activeModalDuty}
+        dutyType={prayerDutyMode}
         onSuccess={() => {
           refreshData();
           setPrayerModalOpen(false);
@@ -595,6 +408,17 @@ export const TodayOverview: React.FC = () => {
         onSuccess={() => {
           refreshData();
           setChangeGroupModalOpen(false);
+        }}
+      />
+
+      <EditDutyModal
+        isOpen={editDutyModalOpen}
+        onClose={() => setEditDutyModalOpen(false)}
+        date={todayDate}
+        dutyType={editDutyMode}
+        onSuccess={() => {
+          refreshData();
+          setEditDutyModalOpen(false);
         }}
       />
     </div>
